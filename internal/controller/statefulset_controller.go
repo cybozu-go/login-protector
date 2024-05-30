@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/cybozu-go/login-protector/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -18,8 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-const KeyUpdateStrategy = "login-protector.cybozu.io/update-strategy"
-
 // StatefulSetReconciler reconciles a StatefulSet object
 type StatefulSetReconciler struct {
 	Client    client.Client
@@ -27,9 +26,8 @@ type StatefulSetReconciler struct {
 	Scheme    *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods/eviction,verbs=create
 
@@ -51,7 +49,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	strategy := sts.Labels[KeyUpdateStrategy]
+	strategy := sts.Labels[common.LabelKeyUpdateStrategy]
 	if strategy == "" {
 		logger.Info("the statefulset does not have the update strategy label")
 		return ctrl.Result{}, nil
@@ -163,7 +161,7 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to primary resource StatefulSet that has the specific labels
 	targetStsPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      KeyUpdateStrategy,
+			Key:      common.LabelKeyUpdateStrategy,
 			Operator: metav1.LabelSelectorOpExists,
 		}},
 	})
@@ -185,7 +183,7 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		}
 		// check if the sts has the specific labels
-		if _, ok := sts.Labels[KeyUpdateStrategy]; !ok {
+		if _, ok := sts.Labels[common.LabelKeyUpdateStrategy]; !ok {
 			return false
 		}
 		return true

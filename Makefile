@@ -70,11 +70,11 @@ lint-fix: setup ## Run golangci-lint linter and perform fixes
 
 .PHONY: build
 build: manifests fmt vet ## Build manager binary.
-	go build -o bin/login-protector cmd/main.go
+	go build -o bin/login-protector cmd/login-protector/main.go
 
 .PHONY: run
 run: manifests fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+	go run ./cmd/login-protector/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -122,11 +122,11 @@ ifndef ignore-not-found
 endif
 
 .PHONY: start-kind
-start-kind:
+start-kind: setup
 	kind create cluster
 
 .PHONY: stop-kind
-stop-kind:
+stop-kind: setup
 	kind delete cluster
 
 .PHONY: deploy

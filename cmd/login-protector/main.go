@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -102,6 +103,14 @@ func main() {
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
+
+	logger := mgr.GetLogger().WithName("TTYWatcher")
+	watcher := controller.NewPDBController(mgr.GetClient(), logger, 5*time.Second)
+	err = mgr.Add(watcher)
+	if err != nil {
+		setupLog.Error(err, "unable to add runnable", "controller", "StatefulSet")
+		os.Exit(1)
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

@@ -10,14 +10,23 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY cmd/main.go cmd/main.go
+COPY cmd/ cmd/
 COPY internal/controller/ internal/controller/
 
-RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o login-protector cmd/main.go
+RUN CGO_ENABLED=0 go install -ldflags="-w -s" ./...
 
-FROM scratch
+# Build the tty-exporter binary
+FROM scratch AS tty-exporter
 LABEL org.opencontainers.image.source="https://github.com/cybozu-go/login-protector"
 
-COPY --from=build /workspace/login-protector .
+COPY --from=build /go/bin/tty-exporter .
+USER 10000:10000
+ENTRYPOINT ["/tty-exporter"]
+
+# Build the login-protector binary
+FROM scratch AS login-protector
+LABEL org.opencontainers.image.source="https://github.com/cybozu-go/login-protector"
+
+COPY --from=build /go/bin/login-protector .
 USER 10000:10000
 ENTRYPOINT ["/login-protector"]

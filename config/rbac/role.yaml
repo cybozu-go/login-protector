@@ -23,19 +23,9 @@ rules:
   resources:
   - statefulsets
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets/finalizers
-  verbs:
-  - update
 - apiGroups:
   - apps
   resources:
@@ -44,3 +34,11 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudget
+  verbs:
+  - create
+  - delete
+  - get
