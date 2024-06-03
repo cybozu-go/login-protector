@@ -7,17 +7,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/cybozu-go/login-protector/internal/common"
 	"github.com/go-logr/logr"
-	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -38,29 +37,18 @@ func NewPDBController(client client.Client, logger logr.Logger, interval time.Du
 
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudget,verbs=create;get;delete
+//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;get;list;watch;delete
 
 func (w *PDBController) Start(ctx context.Context) error {
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 
-	m := sync.Mutex{}
-
 	for {
 		select {
 		case <-ctx.Done():
-			m.Lock() // wait for doPollPods completion
 			return nil
 		case <-ticker.C:
-			if m.TryLock() {
-				go func() {
-					defer m.Unlock()
-					w.pollPods(ctx)
-				}()
-			} else {
-				metricsPollingSkipsCounter.Inc()
-				w.logger.Info(fmt.Sprintf("The previous polling takes more than %d seconds. Skip polling this time.", w.interval))
-			}
+			w.pollPods(ctx)
 		}
 	}
 }
@@ -71,12 +59,12 @@ func (w *PDBController) pollPods(ctx context.Context) {
 	defer func() {
 		duration := time.Since(startTime)
 		metricsPollingDurationSecondsHistogram.Observe(duration.Seconds())
-		w.logger.Info("polling completed", zap.Duration("duration", duration.Round(time.Millisecond)))
+		w.logger.Info("polling completed", "duration", duration.Round(time.Millisecond))
 	}()
 
 	var stsList appsv1.StatefulSetList
 	err := w.client.List(ctx, &stsList, &client.ListOptions{
-		Namespace: "default",
+		LabelSelector: labels.SelectorFromSet(map[string]string{common.LabelKeyLoginProtectorTarget: "true"}),
 	})
 	if err != nil {
 		w.logger.Error(err, "failed to list StatefulSets")
@@ -111,7 +99,8 @@ func (w *PDBController) reconcilePDB(ctx context.Context, pod *corev1.Pod) {
 
 	var container *corev1.Container
 	for _, c := range pod.Spec.Containers {
-		if c.Name == "ttypdb-sidecar" {
+		c := c
+		if c.Name == "tty-exporter" {
 			container = &c
 			break
 		}
@@ -130,7 +119,7 @@ func (w *PDBController) reconcilePDB(ctx context.Context, pod *corev1.Pod) {
 		w.logger.Error(err, "failed to get status")
 		return
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint:errcheck
 
 	status := common.Status{}
 	statusBytes, err := io.ReadAll(resp.Body)

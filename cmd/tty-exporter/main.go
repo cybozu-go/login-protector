@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cybozu-go/login-protector/internal/common"
-	tty_exporter "github.com/cybozu-go/login-protector/internal/tty-exporter"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/cybozu-go/login-protector/internal/common"
+	tty_exporter "github.com/cybozu-go/login-protector/internal/tty-exporter"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 )
 
 const httpServerPort = 8080
@@ -25,12 +26,8 @@ func newZapLogger() *zap.Logger {
 }
 
 func main() {
-	os.Exit(run())
-}
-
-func run() int {
 	logger := newZapLogger()
-	defer logger.Sync()
+	defer logger.Sync() //nolint:errcheck
 	logger.Info("starting ttypdb-sidecar...")
 
 	tty_exporter.InitMetrics(logger)
@@ -66,7 +63,7 @@ func run() int {
 		defer cancel()
 		go func() {
 			<-ctx.Done()
-			server.Shutdown(context.Background())
+			server.Shutdown(context.Background()) //nolint:errcheck
 		}()
 		err := server.ListenAndServe()
 		if err != http.ErrServerClosed {
@@ -76,7 +73,6 @@ func run() int {
 
 	wg.Wait()
 	logger.Info("termination completed")
-	return 0
 }
 
 func handleReadyz(http.ResponseWriter, *http.Request) {

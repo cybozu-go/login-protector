@@ -4,7 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const metricsNamespace = "ttypdb_controller"
+const metricsNamespace = "login_protector"
 
 var metricsPollingSkipsCounter = prometheus.NewCounter(
 	prometheus.CounterOpts{

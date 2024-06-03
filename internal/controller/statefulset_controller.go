@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 
 	"github.com/cybozu-go/login-protector/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
@@ -49,24 +48,18 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	strategy := sts.Labels[common.LabelKeyUpdateStrategy]
-	if strategy == "" {
-		logger.Info("the statefulset does not have the update strategy label")
+	target := sts.Labels[common.LabelKeyLoginProtectorTarget]
+	if target != "true" {
+		logger.Info("the statefulset is not a target of login protector")
 		return ctrl.Result{}, nil
 	}
 
-	switch strategy {
-	case "evict":
-		requeue, err := r.evictPod(ctx, sts)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if requeue {
-			return ctrl.Result{Requeue: true}, nil
-		}
-	default:
-		logger.Error(errors.New("unknown update strategy"), "unknown update strategy", "strategy", strategy)
-		return ctrl.Result{}, nil
+	requeue, err := r.evictPod(ctx, sts)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if requeue {
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// When all pods are up-to-date, update the currentRevision of the StatefulSet
@@ -113,6 +106,7 @@ func (r *StatefulSetReconciler) evictPod(ctx context.Context, sts *appsv1.Statef
 	// Evict one of the outdated pods
 	var pod *corev1.Pod
 	for _, p := range outdatedPods {
+		p := p
 		if p.Status.Phase != corev1.PodRunning {
 			logger.Info("not running pod found", "pod", p.Name, "namespace", p.Namespace)
 			pod = &p
@@ -161,7 +155,7 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to primary resource StatefulSet that has the specific labels
 	targetStsPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      common.LabelKeyUpdateStrategy,
+			Key:      common.LabelKeyLoginProtectorTarget,
 			Operator: metav1.LabelSelectorOpExists,
 		}},
 	})
@@ -183,7 +177,7 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		}
 		// check if the sts has the specific labels
-		if _, ok := sts.Labels[common.LabelKeyUpdateStrategy]; !ok {
+		if _, ok := sts.Labels[common.LabelKeyLoginProtectorTarget]; !ok {
 			return false
 		}
 		return true

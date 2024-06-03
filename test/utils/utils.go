@@ -1,12 +1,21 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
 	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
+	. "github.com/onsi/gomega"
 )
 
 // Run executes the provided command within this context
@@ -18,7 +27,6 @@ func Run(cmd *exec.Cmd) ([]byte, error) {
 		fmt.Fprintf(GinkgoWriter, "chdir dir: %s\n", err)
 	}
 
-	cmd.Env = append(os.Environ(), "GO111MODULE=on")
 	command := strings.Join(cmd.Args, " ")
 	fmt.Fprintf(GinkgoWriter, "running: %s\n", command)
 	output, err := cmd.CombinedOutput()
@@ -27,18 +35,6 @@ func Run(cmd *exec.Cmd) ([]byte, error) {
 	}
 
 	return output, nil
-}
-
-// LoadImageToKindCluster loads a local docker image to the kind cluster
-func LoadImageToKindClusterWithName(name string) error {
-	cluster := "kind"
-	if v, ok := os.LookupEnv("KIND_CLUSTER"); ok {
-		cluster = v
-	}
-	kindOptions := []string{"load", "docker-image", name, "--name", cluster}
-	cmd := exec.Command("kind", kindOptions...)
-	_, err := Run(cmd)
-	return err
 }
 
 // GetNonEmptyLines converts given command output string into individual objects
@@ -63,4 +59,58 @@ func GetProjectDir() (string, error) {
 	}
 	wd = strings.Replace(wd, "/test/e2e", "", -1)
 	return wd, nil
+}
+
+func Kubectl(input io.Reader, args ...string) ([]byte, error) {
+	cmd := exec.Command("kubectl", args...)
+	cmd.Stdin = input
+	stdout, err := Run(cmd)
+	if err == nil {
+		return stdout, nil
+	}
+	return nil, fmt.Errorf("kubectl failed with %s", err)
+}
+
+func KubectlSafe(input io.Reader, args ...string) []byte {
+	out, err := Kubectl(input, args...)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	return out
+}
+
+var scheme = runtime.NewScheme()
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+}
+
+func GetResource[T runtime.Object](ns, name string, obj T, opts ...string) error {
+	var args []string
+	if ns != "" {
+		args = append(args, "-n", ns)
+	}
+	gvk, err := apiutil.GVKForObject(obj, scheme)
+	if err != nil {
+		return err
+	}
+	if strings.HasSuffix(gvk.Kind, "List") && meta.IsListType(obj) {
+		gvk.Kind = gvk.Kind[:len(gvk.Kind)-4]
+	}
+	args = append(args, "get", gvk.Kind)
+	if name != "" {
+		args = append(args, name)
+	}
+	args = append(args, "-o", "json")
+	args = append(args, opts...)
+	data, err := Kubectl(nil, args...)
+	if err != nil {
+		return err
+	}
+	if len(data) == 0 {
+		if meta.IsListType(obj) {
+			data = []byte(fmt.Sprintf(`{"apiVersion":"%s","kind":"%s","items":[]}`, gvk.GroupVersion().String(), gvk.Kind))
+		} else {
+			data = []byte(fmt.Sprintf(`{"apiVersion":"%s","kind":"%s"}`, gvk.GroupVersion().String(), gvk.Kind))
+		}
+	}
+	return json.Unmarshal(data, obj)
 }

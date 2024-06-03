@@ -1,3 +1,3 @@
 package common
 
-const LabelKeyUpdateStrategy = "login-protector.cybozu.io/update-strategy"
+const LabelKeyLoginProtectorTarget = "login-protector.cybozu.io/target"

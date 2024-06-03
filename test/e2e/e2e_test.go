@@ -5,85 +5,118 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/creack/pty"
+	"github.com/cybozu-go/login-protector/test/utils"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cybozu-go/login-protector/test/utils"
 )
 
 const namespace = "login-protector-system"
 
 var _ = Describe("controller", Ordered, func() {
 	BeforeAll(func() {
-		By("creating manager namespace")
-		cmd := exec.Command("kubectl", "create", "ns", namespace)
-		_, _ = utils.Run(cmd)
 	})
 
 	AfterAll(func() {
-		By("removing manager namespace")
-		cmd := exec.Command("kubectl", "delete", "ns", namespace)
-		_, _ = utils.Run(cmd)
 	})
 
 	Context("Operator", func() {
 		It("should run successfully", func() {
-			var controllerPodName string
-			var err error
-
-			// projectimage stores the name of the image used in the example
-			var projectimage = "cybozu-go/login-protector:dev"
-
-			By("building the manager(Operator) image")
-			cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))
-			_, err = utils.Run(cmd)
-			ExpectWithOffset(1, err).NotTo(HaveOccurred())
-
-			By("loading the the manager(Operator) image on Kind")
-			err = utils.LoadImageToKindClusterWithName(projectimage)
-			ExpectWithOffset(1, err).NotTo(HaveOccurred())
-
-			By("deploying the controller-manager")
-			cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectimage))
-			_, err = utils.Run(cmd)
-			ExpectWithOffset(1, err).NotTo(HaveOccurred())
-
 			By("validating that the controller-manager pod is running as expected")
 			verifyControllerUp := func() error {
 				// Get pod name
-
-				cmd = exec.Command("kubectl", "get",
-					"pods", "-l", "control-plane=controller-manager",
-					"-o", "go-template={{ range .items }}"+
-						"{{ if not .metadata.deletionTimestamp }}"+
-						"{{ .metadata.name }}"+
-						"{{ \"\\n\" }}{{ end }}{{ end }}",
-					"-n", namespace,
-				)
-
-				podOutput, err := utils.Run(cmd)
+				pods := &corev1.PodList{}
+				err := utils.GetResource(namespace, "", pods, "-l", "control-plane=controller-manager")
 				ExpectWithOffset(2, err).NotTo(HaveOccurred())
-				podNames := utils.GetNonEmptyLines(string(podOutput))
-				if len(podNames) != 1 {
-					return fmt.Errorf("expect 1 controller pods running, but got %d", len(podNames))
+				if len(pods.Items) != 1 {
+					return fmt.Errorf("expect 1 controller pods running, but got %d", len(pods.Items))
 				}
-				controllerPodName = podNames[0]
-				ExpectWithOffset(2, controllerPodName).Should(ContainSubstring("controller-manager"))
+				controllerPod := pods.Items[0]
+				ExpectWithOffset(2, controllerPod.Name).Should(ContainSubstring("controller-manager"))
 
 				// Validate pod status
-				cmd = exec.Command("kubectl", "get",
-					"pods", controllerPodName, "-o", "jsonpath={.status.phase}",
-					"-n", namespace,
-				)
-				status, err := utils.Run(cmd)
-				ExpectWithOffset(2, err).NotTo(HaveOccurred())
-				if string(status) != "Running" {
-					return fmt.Errorf("controller pod in %s status", status)
+				if string(controllerPod.Status.Phase) != "Running" {
+					return fmt.Errorf("controller pod in %s status", controllerPod.Status.Phase)
 				}
 				return nil
 			}
 			EventuallyWithOffset(1, verifyControllerUp, time.Minute, time.Second).Should(Succeed())
 
+		})
+
+		It("should deploy target StatefulSet", func() {
+			By("deploying target StatefulSet")
+			_, err := utils.Kubectl(nil, "apply", "-f", "./test/testdata/statefulset.yaml")
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				statefulset := appsv1.StatefulSet{}
+				err := utils.GetResource("", "teststs", &statefulset)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(statefulset.Status.ReadyReplicas).Should(BeNumerically("==", 2))
+			}).Should(Succeed())
+		})
+
+		const configuredPollingIntervalSeconds = 5
+		const testIntervalSeconds = configuredPollingIntervalSeconds + 2
+		const testInterval = time.Second * time.Duration(testIntervalSeconds)
+
+		It("should create PodDisruptionBudgets", func() {
+
+			// prepare
+			ptmx, err := pty.Start(exec.Command("bash"))
+			Expect(err).NotTo(HaveOccurred())
+			defer ptmx.Close()
+
+			pdbList := &policyv1.PodDisruptionBudgetList{}
+			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+
+			// a PDB should be created for teststs-0 because it is selected by `-l` option of the controller
+
+			go func() {
+				_, err := utils.Kubectl(ptmx, "exec", "teststs-0", "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
+				if err != nil {
+					panic(err)
+				}
+			}()
+
+			time.Sleep(testInterval)
+
+			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
+			Expect(pdbList.Items[0].Name).Should(Equal("teststs-0"))
+			Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal("teststs-0"))
+
+			// the PDB should be deleted after the logout from the Pod
+
+			time.Sleep(testInterval)
+
+			fmt.Println("PDB should be deleted")
+			pdbList = &policyv1.PodDisruptionBudgetList{}
+			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+
+			// a PDB should not be created for teststs2-0 because it is not selected by `-l` option of the controller
+			go func() {
+				_, err := utils.Kubectl(ptmx, "exec", "teststs2-0", "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
+				if err != nil {
+					panic(err)
+				}
+			}()
+
+			time.Sleep(testInterval)
+
+			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
 		})
 	})
 })

@@ -11,9 +11,9 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/ cmd/
-COPY internal/controller/ internal/controller/
+COPY internal/ internal/
 
-RUN CGO_ENABLED=0 go install -ldflags="-w -s" ./...
+RUN CGO_ENABLED=0 go install -ldflags="-w -s" ./cmd/...
 
 # Build the tty-exporter binary
 FROM scratch AS tty-exporter

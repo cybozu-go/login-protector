@@ -21,7 +21,7 @@ func NewStatusHandler(logger *zap.Logger) http.Handler {
 func writeError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Header().Add("Content-Type", "text/plain")
-	w.Write([]byte(err.Error()))
+	w.Write([]byte(err.Error())) //nolint:errcheck
 }
 
 func (h *StatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -41,5 +41,5 @@ func (h *StatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
-	w.Write(out)
+	w.Write(out) //nolint:errcheck
 }

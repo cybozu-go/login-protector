@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const metricsNamespace = "tty-exporter"
+const metricsNamespace = "tty_exporter"
 
 func InitMetrics(logger *zap.Logger) {
 	prometheus.MustRegister(prometheus.NewGaugeFunc(
