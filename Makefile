@@ -1,6 +1,6 @@
 # Image URL to use all building/pushing image targets
-PROTECTOR_IMG ?= cybozu-go/login-protector:dev
-EXPORTER_IMG ?= cybozu-go/tty-exporter:dev
+PROTECTOR_IMG ?= login-protector:dev
+EXPORTER_IMG ?= tty-exporter:dev
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -71,7 +71,7 @@ lint-fix: setup ## Run golangci-lint linter and perform fixes
 
 .PHONY: build
 build: manifests fmt vet ## Build manager binary.
-	go build -o bin/login-protector cmd/login-protector/main.go
+	GOBIN=$(shell pwd)/bin CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install ./cmd/...
 
 .PHONY: run
 run: manifests fmt vet ## Run a controller from your host.
@@ -115,6 +115,14 @@ start-kind: setup
 .PHONY: stop-kind
 stop-kind: setup
 	kind delete cluster
+
+.PHONY: start-dev
+start-dev: setup
+	ctlptl apply -f ./cluster.yaml
+
+.PHONY: stop-dev
+stop-dev:
+	ctlptl delete -f ./cluster.yaml
 
 .PHONY: deploy
 deploy: manifests setup ## Deploy controller to the K8s cluster specified in ~/.kube/config.

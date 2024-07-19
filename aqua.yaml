@@ -15,3 +15,5 @@ packages:
 - name: kubernetes/kubectl@v1.30.1
 - name: kubernetes-sigs/controller-tools/controller-gen@envtest-v1.30.0
 - name: golangci/golangci-lint@v1.59.0
+- name: tilt-dev/ctlptl@v0.8.29
+- name: tilt-dev/tilt@v0.33.17
