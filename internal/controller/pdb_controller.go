@@ -121,18 +121,18 @@ func (w *PDBController) reconcilePDB(ctx context.Context, pod *corev1.Pod) {
 	}
 	defer resp.Body.Close() // nolint:errcheck
 
-	status := common.Status{}
-	statusBytes, err := io.ReadAll(resp.Body)
+	procs := common.TTYProcesses{}
+	procsBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		w.logger.Error(err, "failed to get status")
 		return
 	}
-	err = json.Unmarshal(statusBytes, &status)
+	err = json.Unmarshal(procsBytes, &procs)
 	if err != nil {
 		w.logger.Error(err, "failed to unmarshal status")
 		return
 	}
-	if status.TTYs < 0 {
+	if procs.Total < 0 {
 		w.logger.Error(errors.New("broken status"), "broken status")
 		return
 	}
@@ -150,7 +150,7 @@ func (w *PDBController) reconcilePDB(ctx context.Context, pod *corev1.Pod) {
 		foundPdb = true
 	}
 
-	if status.TTYs == 0 {
+	if procs.Total == 0 {
 		// no controlling terminals are observed. delete PDB.
 		if !foundPdb {
 			w.logger.Info("PDB does not exist")

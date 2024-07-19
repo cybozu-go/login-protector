@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/cybozu-go/login-protector/internal/common"
 	"go.uber.org/zap"
 )
 
@@ -25,16 +24,13 @@ func writeError(w http.ResponseWriter, err error) {
 }
 
 func (h *StatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	num, err := ttyCount()
+	res, err := getTTYProcesses()
 	if err != nil {
 		h.logger.Error("failed to count ttys", zap.Error(err))
 		writeError(w, err)
 		return
 	}
-	status := common.Status{
-		TTYs: num,
-	}
-	out, err := json.Marshal(&status)
+	out, err := json.Marshal(&res)
 	if err != nil {
 		h.logger.Error("failed to marshal", zap.Error(err))
 		writeError(w, err)
