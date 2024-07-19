@@ -2,21 +2,19 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: teststs
+  name: target-sts
   labels:
     login-protector.cybozu.io/target: "true"
 spec:
   replicas: 2
   selector:
     matchLabels:
-      name: teststs
-  serviceName: teststs
+      name: target-sts
+  serviceName: target-sts
   template:
     metadata:
       labels:
-        name: teststs
-        foo: bar
-        hoge: fuga
+        name: target-sts
     spec:
       containers:
       - name: main
@@ -25,28 +23,28 @@ spec:
         command: [ "sleep", "infinity" ]
       - name: tty-exporter
         image: tty-exporter:dev
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         ports:
         - name: sidecar
           containerPort: 8080
       shareProcessNamespace: true
+  updateStrategy:
+    type: OnDelete
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: teststs2
+  name: not-target-sts
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: teststs2
-  serviceName: teststs2
+      name: not-target-sts
+  serviceName: not-target-sts
   template:
     metadata:
       labels:
-        name: teststs2
-        foo: baz
-        hoge: piyo
+        name: not-target-sts
     spec:
       containers:
       - name: main
@@ -55,8 +53,10 @@ spec:
         command: [ "sleep", "infinity" ]
       - name: tty-exporter
         image: tty-exporter:dev
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         ports:
         - name: sidecar
           containerPort: 8080
       shareProcessNamespace: true
+  updateStrategy:
+    type: OnDelete

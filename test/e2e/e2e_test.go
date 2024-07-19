@@ -55,7 +55,7 @@ var _ = Describe("controller", Ordered, func() {
 
 			Eventually(func(g Gomega) {
 				statefulset := appsv1.StatefulSet{}
-				err := utils.GetResource("", "teststs", &statefulset)
+				err := utils.GetResource("", "target-sts", &statefulset)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(statefulset.Status.ReadyReplicas).Should(BeNumerically("==", 2))
 			}).Should(Succeed())
@@ -67,56 +67,101 @@ var _ = Describe("controller", Ordered, func() {
 
 		It("should create PodDisruptionBudgets", func() {
 
-			// prepare
+			// prepare a PTY to run kubectl exec
 			ptmx, err := pty.Start(exec.Command("bash"))
 			Expect(err).NotTo(HaveOccurred())
 			defer ptmx.Close()
 
+			// make sure no PDB exists
 			pdbList := &policyv1.PodDisruptionBudgetList{}
 			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
 
-			// a PDB should be created for teststs-0 because it is selected by `-l` option of the controller
-
+			// login to target-sts-0 Pod using `kubectl exec`
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "teststs-0", "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
+				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
 				if err != nil {
 					panic(err)
 				}
 			}()
 
+			// wait for login-protector to create PDB
 			time.Sleep(testInterval)
 
+			// a PDB should be created for target-sts-0 because it has the target label (`login-protector.cybozu.io/target: "true"`)
 			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
-			Expect(pdbList.Items[0].Name).Should(Equal("teststs-0"))
-			Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal("teststs-0"))
+			Expect(pdbList.Items[0].Name).Should(Equal("target-sts-0"))
+			Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal("target-sts-0"))
 
-			// the PDB should be deleted after the logout from the Pod
-
+			// wait for the PDB to be deleted
 			time.Sleep(testInterval)
 
+			// the PDB should be deleted after the logout from the Pod
 			fmt.Println("PDB should be deleted")
 			pdbList = &policyv1.PodDisruptionBudgetList{}
 			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
 
-			// a PDB should not be created for teststs2-0 because it is not selected by `-l` option of the controller
+			// login to not-target-sts-0 Pod using `kubectl exec`
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "teststs2-0", "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
+				_, err := utils.Kubectl(ptmx, "exec", "not-target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
 				if err != nil {
 					panic(err)
 				}
 			}()
 
+			// wait for login-protector
 			time.Sleep(testInterval)
 
+			// a PDB should not be created for not-target-sts-0 because it does not have the target label (`login-protector.cybozu.io/target: "true"`)
 			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+		})
+
+		It("should stop updating the target statefulset", func() {
+			// prepare a PTY to run kubectl exec
+			ptmx, err := pty.Start(exec.Command("bash"))
+			Expect(err).NotTo(HaveOccurred())
+			defer ptmx.Close()
+
+			// login to target-sts-0 Pod using `kubectl exec`
+			go func() {
+				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 2*testIntervalSeconds+2))
+				if err != nil {
+					panic(err)
+				}
+			}()
+
+			// wait for login-protector to create PDB
+			time.Sleep(testInterval)
+
+			// update container image of target-sts
+			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-debug:22.04")
+			Expect(err).NotTo(HaveOccurred())
+
+			// make sure the container image is not updated
+			Consistently(func(g Gomega) {
+				pod := &corev1.Pod{}
+				err := utils.GetResource("", "target-sts-0", pod)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pod.Status.ContainerStatuses[0].Image).ShouldNot(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+			}).WithTimeout(testInterval).Should(Succeed())
+
+			// wait for the PDB to be deleted
+			time.Sleep(testInterval)
+
+			// make sure the container image is updated
+			Eventually(func(g Gomega) {
+				pod := &corev1.Pod{}
+				err := utils.GetResource("", "target-sts-0", pod)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pod.Status.ContainerStatuses[0].Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+			}).Should(Succeed())
 		})
 	})
 })
