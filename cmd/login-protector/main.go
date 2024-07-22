@@ -3,7 +3,9 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	appsv1 "k8s.io/api/apps/v1"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -40,6 +42,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var ttyCheckInterval time.Duration
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -49,6 +52,7 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.DurationVar(&ttyCheckInterval, "tty-check-interval", 5*time.Second, "interval to check TTY")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -87,14 +91,15 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "550e7c09.cybozu.io",
+		LeaderElectionID:       "login-protector.cybozu.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controller.StatefulSetReconciler{
+	setupLog.Info("creating statefulset controller")
+	if err = (&controller.StatefulSetUpdater{
 		Client:    mgr.GetClient(),
 		ClientSet: kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Scheme:    mgr.GetScheme(),
@@ -102,15 +107,31 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
 
-	logger := mgr.GetLogger().WithName("TTYWatcher")
-	watcher := controller.NewPDBController(mgr.GetClient(), logger, 5*time.Second)
+	setupLog.Info("creating tty watcher")
+	ch := make(chan event.TypedGenericEvent[*appsv1.StatefulSet])
+	watcher := controller.NewTTYWatcher(
+		mgr.GetClient(),
+		mgr.GetLogger().WithName("TTYWatcher"),
+		ttyCheckInterval,
+		ch,
+	)
 	err = mgr.Add(watcher)
 	if err != nil {
-		setupLog.Error(err, "unable to add runnable", "controller", "StatefulSet")
+		setupLog.Error(err, "unable to add runnable", "controller", "PDB")
 		os.Exit(1)
 	}
+
+	setupLog.Info("creating pdb controller")
+	if err = (&controller.PDBReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr, ch); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PDB")
+		os.Exit(1)
+	}
+
+	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

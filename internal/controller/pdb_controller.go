@@ -7,92 +7,107 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/cybozu-go/login-protector/internal/common"
-	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-type PDBController struct {
-	client   client.Client
-	logger   logr.Logger
-	interval time.Duration
-}
-
-func NewPDBController(client client.Client, logger logr.Logger, interval time.Duration) *PDBController {
-	return &PDBController{
-		client:   client,
-		logger:   logger,
-		interval: interval,
-	}
+type PDBReconciler struct {
+	Client client.Client
+	Scheme *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;get;list;watch;delete
 
-func (w *PDBController) Start(ctx context.Context) error {
-	ticker := time.NewTicker(w.interval)
-	defer ticker.Stop()
+func (r *PDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			w.pollPods(ctx)
-		}
+	sts := &appsv1.StatefulSet{}
+	if err := r.Client.Get(ctx, req.NamespacedName, sts); err != nil {
+		logger.Error(err, "failed to get StatefulSet")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-}
+	if sts.DeletionTimestamp != nil {
+		logger.Info("the statefulset is being deleted")
+		return ctrl.Result{}, nil
+	}
 
-func (w *PDBController) pollPods(ctx context.Context) {
-	w.logger.Info("polling start")
-	startTime := time.Now()
-	defer func() {
-		duration := time.Since(startTime)
-		metricsPollingDurationSecondsHistogram.Observe(duration.Seconds())
-		w.logger.Info("polling completed", "duration", duration.Round(time.Millisecond))
-	}()
-
-	var stsList appsv1.StatefulSetList
-	err := w.client.List(ctx, &stsList, &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{common.LabelKeyLoginProtectorTarget: "true"}),
-	})
+	var podList corev1.PodList
+	err := r.Client.List(ctx, &podList, client.InNamespace(sts.Namespace), client.MatchingLabels(sts.Spec.Selector.MatchLabels))
 	if err != nil {
-		w.logger.Error(err, "failed to list StatefulSets")
-		return
+		return ctrl.Result{}, err
 	}
 
-	targetPods := make([]corev1.Pod, 0)
+	exporterName := "tty-exporter"
+	if name, ok := sts.Annotations[common.AnnotationKeyExporterName]; ok {
+		exporterName = name
+	}
+	exporterPort := "8080"
+	if port, ok := sts.Annotations[common.AnnotationKeyExporterPort]; ok {
+		exporterPort = port
+	}
+	noPDB := false
+	if noPDBStr, ok := sts.Annotations[common.AnnotationKeyNoPDB]; ok {
+		noPDB = noPDBStr == "true"
+	}
 
-	// Get all pods that belong to the StatefulSets
-	for _, sts := range stsList.Items {
-		var podList corev1.PodList
-		err = w.client.List(ctx, &podList, client.InNamespace(sts.Namespace), client.MatchingLabels(sts.Spec.Selector.MatchLabels))
+	errorList := make([]error, 0)
+	for _, pod := range podList.Items {
+		err = r.reconcilePDB(ctx, &pod, exporterName, exporterPort, noPDB)
 		if err != nil {
-			w.logger.Error(err, "failed to list Pods")
-			return
+			errorList = append(errorList, err)
 		}
-		targetPods = append(targetPods, podList.Items...)
 	}
 
-	for _, pod := range targetPods {
-		w.reconcilePDB(ctx, &pod)
+	if len(errorList) > 0 {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile PDB: %v", errorList)
 	}
+
+	return ctrl.Result{}, nil
 }
 
-func (w *PDBController) reconcilePDB(ctx context.Context, pod *corev1.Pod) {
+func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, exporterName string, exporterPort string, noPDB bool) error {
+	logger := log.FromContext(ctx)
+
 	if pod.DeletionTimestamp != nil {
-		w.logger.Info("the Pod is about to be deleted. skipping.")
-		return
+		logger.Info("the Pod is about to be deleted. skipping.")
+		return nil
+	}
+
+	if val, ok := pod.Annotations[common.AnnotationKeyNoPDB]; ok {
+		noPDB = noPDB || (val == "true")
+	}
+	if noPDB {
+		pdb := &policyv1.PodDisruptionBudget{}
+		err := r.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, pdb)
+		if err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			logger.Info("delete PDB, because pod has no PDB annotation", "pdb", pdb, "pod", pod.Name, "namespace", pod.Namespace)
+			err = r.Client.Delete(ctx, pdb)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	podIP := pod.Status.PodIP
@@ -100,74 +115,62 @@ func (w *PDBController) reconcilePDB(ctx context.Context, pod *corev1.Pod) {
 	var container *corev1.Container
 	for _, c := range pod.Spec.Containers {
 		c := c
-		if c.Name == "tty-exporter" {
+		if c.Name == exporterName {
 			container = &c
 			break
 		}
 	}
 	if container == nil {
-		w.logger.Error(errors.New("failed to find sidecar container"), "failed to find sidecar container")
-		return
-	}
-	if len(container.Ports) < 1 {
-		w.logger.Error(errors.New("failed to get sidecar container port"), "failed to get sidecar container port")
-		return
+		err := fmt.Errorf("failed to find sidecar container (Name: %s)", exporterName)
+		return err
 	}
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%d/status", podIP, container.Ports[0].ContainerPort))
+	resp, err := http.Get(fmt.Sprintf("http://%s:%s/status", podIP, exporterPort))
 	if err != nil {
-		w.logger.Error(err, "failed to get status")
-		return
+		return err
 	}
 	defer resp.Body.Close() // nolint:errcheck
 
-	procs := common.TTYProcesses{}
-	procsBytes, err := io.ReadAll(resp.Body)
+	status := common.TTYStatus{}
+	statusBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		w.logger.Error(err, "failed to get status")
-		return
+		return err
 	}
-	err = json.Unmarshal(procsBytes, &procs)
+	err = json.Unmarshal(statusBytes, &status)
 	if err != nil {
-		w.logger.Error(err, "failed to unmarshal status")
-		return
+		return err
 	}
-	if procs.Total < 0 {
-		w.logger.Error(errors.New("broken status"), "broken status")
-		return
+	if status.Total < 0 {
+		err = errors.New("broken status")
+		return err
 	}
 
 	foundPdb := false
 	pdb := &policyv1.PodDisruptionBudget{}
-	err = w.client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, pdb)
+	err = r.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, pdb)
 	if err != nil {
-		var k8serr *k8serrors.StatusError
-		if !errors.As(err, &k8serr) || k8serr.Status().Reason != metav1.StatusReasonNotFound {
-			w.logger.Error(err, "failed to check PDB")
-			return
+		if !k8serrors.IsNotFound(err) {
+			return err
 		}
 	} else {
 		foundPdb = true
 	}
 
-	if procs.Total == 0 {
+	if status.Total == 0 {
 		// no controlling terminals are observed. delete PDB.
 		if !foundPdb {
-			w.logger.Info("PDB does not exist")
-			return
+			return nil
 		}
 
-		err = w.client.Delete(ctx, pdb)
+		logger.Info("delete PDB", "pdb", pdb, "pod", pod.Name, "namespace", pod.Namespace)
+		err = r.Client.Delete(ctx, pdb)
 		if err != nil {
-			w.logger.Error(err, "failed to delete PDB")
-		} else {
-			w.logger.Info("deleted PDB")
+			return err
 		}
 	} else {
 		// some controlling terminals are observed. create PDB.
 		if foundPdb {
-			w.logger.Info("PDB already exists")
-			return
+			return nil
 		}
 
 		zeroIntstr := intstr.FromInt32(0)
@@ -191,11 +194,28 @@ func (w *PDBController) reconcilePDB(ctx context.Context, pod *corev1.Pod) {
 				MaxUnavailable: &zeroIntstr,
 			},
 		}
-		err := w.client.Create(ctx, pdb)
+		logger.Info("crate a new PDB", "pdb", pdb, "pod", pod.Name, "namespace", pod.Namespace)
+		err = r.Client.Create(ctx, pdb)
 		if err != nil {
-			w.logger.Error(err, "failed to create PDB")
-		} else {
-			w.logger.Info("created PDB")
+			return err
 		}
 	}
+	return nil
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *PDBReconciler) SetupWithManager(mgr ctrl.Manager, ch chan event.TypedGenericEvent[*appsv1.StatefulSet]) error {
+	targetStsPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{{
+			Key:      common.LabelKeyLoginProtectorProtect,
+			Operator: metav1.LabelSelectorOpExists,
+		}},
+	})
+	if err != nil {
+		return err
+	}
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1.StatefulSet{}, builder.WithPredicates(targetStsPredicate)).
+		WatchesRawSource(source.Channel(ch, &handler.TypedEnqueueRequestForObject[*appsv1.StatefulSet]{})).
+		Complete(r)
 }

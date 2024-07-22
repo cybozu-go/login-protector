@@ -11,10 +11,10 @@ import (
 
 var errProcStat = errors.New("broken process stat")
 
-// getTTYProcesses returns the number of controlling terminals observed.
+// getTTYStatus returns the status of processes associated with TTY.
 // NOTE: This implementation is for Linux.
-func getTTYProcesses() (*common.TTYProcesses, error) {
-	res := &common.TTYProcesses{
+func getTTYStatus() (*common.TTYStatus, error) {
+	res := &common.TTYStatus{
 		Total:     0,
 		Processes: make([]common.Process, 0),
 	}
@@ -51,8 +51,8 @@ func getTTYProcesses() (*common.TTYProcesses, error) {
 			ttyNumber := fields[6]
 			if ttyNumber != "0" {
 				p := common.Process{
-					PID:  name,
-					Name: tcomm,
+					PID:     name,
+					Command: tcomm,
 				}
 				res.Total++
 				res.Processes = append(res.Processes, p)

@@ -18,8 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// StatefulSetReconciler reconciles a StatefulSet object
-type StatefulSetReconciler struct {
+// StatefulSetUpdater reconciles a StatefulSet object
+type StatefulSetUpdater struct {
 	Client    client.Client
 	ClientSet kubernetes.Interface
 	Scheme    *runtime.Scheme
@@ -30,11 +30,11 @@ type StatefulSetReconciler struct {
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods/eviction,verbs=create
 
-func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (u *StatefulSetUpdater) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	sts := &appsv1.StatefulSet{}
-	if err := r.Client.Get(ctx, req.NamespacedName, sts); err != nil {
+	if err := u.Client.Get(ctx, req.NamespacedName, sts); err != nil {
 		logger.Error(err, "failed to get StatefulSet")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -48,13 +48,13 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	target := sts.Labels[common.LabelKeyLoginProtectorTarget]
+	target := sts.Labels[common.LabelKeyLoginProtectorProtect]
 	if target != "true" {
 		logger.Info("the statefulset is not a target of login protector")
 		return ctrl.Result{}, nil
 	}
 
-	requeue, err := r.evictPod(ctx, sts)
+	requeue, err := u.evictPod(ctx, sts)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -68,7 +68,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
 		logger.Info("all pods are up-to-date, but currentRevision does not match updateRevision, updating status")
 		sts.Status.CurrentRevision = sts.Status.UpdateRevision
-		if err := r.Client.Status().Update(ctx, sts); err != nil {
+		if err := u.Client.Status().Update(ctx, sts); err != nil {
 			logger.Error(err, "failed to update StatefulSet status")
 			return ctrl.Result{}, err
 		}
@@ -78,12 +78,12 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
-func (r *StatefulSetReconciler) evictPod(ctx context.Context, sts *appsv1.StatefulSet) (bool, error) {
+func (u *StatefulSetUpdater) evictPod(ctx context.Context, sts *appsv1.StatefulSet) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	// Get pods that belong to the statefulset
 	pods := &corev1.PodList{}
-	if err := r.Client.List(ctx, pods, client.InNamespace(sts.Namespace), client.MatchingLabels(sts.Spec.Selector.MatchLabels)); err != nil {
+	if err := u.Client.List(ctx, pods, client.InNamespace(sts.Namespace), client.MatchingLabels(sts.Spec.Selector.MatchLabels)); err != nil {
 		logger.Error(err, "failed to list pods")
 		return false, err
 	}
@@ -137,25 +137,23 @@ func (r *StatefulSetReconciler) evictPod(ctx context.Context, sts *appsv1.Statef
 			Namespace: pod.Namespace,
 		},
 	}
-	if err := r.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(ctx, &eviction); err != nil {
+	if err := u.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(ctx, &eviction); err != nil {
 		logger.Error(err, "failed to evict pod", "pod", pod.Name, "namespace", pod.Namespace)
 		if apierrors.IsTooManyRequests(err) || apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, err
 	}
-	logger.Info("Successfully evicted pod", "pod", pod.Name, "namespace", pod.Namespace)
+	logger.Info("Successfully evict pod", "pod", pod.Name, "namespace", pod.Namespace)
 
 	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
-	// Watch for changes to primary resource StatefulSet that has the specific labels
+func (u *StatefulSetUpdater) SetupWithManager(mgr ctrl.Manager) error {
 	targetStsPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      common.LabelKeyLoginProtectorTarget,
+			Key:      common.LabelKeyLoginProtectorProtect,
 			Operator: metav1.LabelSelectorOpExists,
 		}},
 	})
@@ -173,11 +171,11 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		// get sts
 		sts := &appsv1.StatefulSet{}
-		if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: o.GetNamespace(), Name: owner.Name}, sts); err != nil {
+		if err := u.Client.Get(context.Background(), client.ObjectKey{Namespace: o.GetNamespace(), Name: owner.Name}, sts); err != nil {
 			return false
 		}
 		// check if the sts has the specific labels
-		if _, ok := sts.Labels[common.LabelKeyLoginProtectorTarget]; !ok {
+		if _, ok := sts.Labels[common.LabelKeyLoginProtectorProtect]; !ok {
 			return false
 		}
 		return true
@@ -186,5 +184,5 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}, builder.WithPredicates(targetStsPredicate)).
 		Owns(&corev1.Pod{}, builder.WithPredicates(targetPodPredicate)).
-		Complete(r)
+		Complete(u)
 }

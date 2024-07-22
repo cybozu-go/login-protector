@@ -1,3 +1,6 @@
 package common
 
-const LabelKeyLoginProtectorTarget = "login-protector.cybozu.io/target"
+const LabelKeyLoginProtectorProtect = "login-protector.cybozu.io/protect"
+const AnnotationKeyNoPDB = "login-protector.cybozu.io/no-pdb"
+const AnnotationKeyExporterName = "login-protector.cybozu.io/exporter-name"
+const AnnotationKeyExporterPort = "login-protector.cybozu.io/exporter-port"

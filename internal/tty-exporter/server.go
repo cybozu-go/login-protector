@@ -24,7 +24,7 @@ func writeError(w http.ResponseWriter, err error) {
 }
 
 func (h *StatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	res, err := getTTYProcesses()
+	res, err := getTTYStatus()
 	if err != nil {
 		h.logger.Error("failed to count ttys", zap.Error(err))
 		writeError(w, err)

@@ -17,7 +17,7 @@ func InitMetrics(logger *zap.Logger) {
 			Help:      "Number of controlling terminals observed",
 		},
 		func() float64 {
-			res, err := getTTYProcesses()
+			res, err := getTTYStatus()
 			if err != nil {
 				logger.Error("failed to count ttys", zap.Error(err))
 				return math.NaN()

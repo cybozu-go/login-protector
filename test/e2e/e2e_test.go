@@ -89,7 +89,7 @@ var _ = Describe("controller", Ordered, func() {
 			// wait for login-protector to create PDB
 			time.Sleep(testInterval)
 
-			// a PDB should be created for target-sts-0 because it has the target label (`login-protector.cybozu.io/target: "true"`)
+			// a PDB should be created for target-sts-0 because it has the target label (`login-protector.cybozu.io/protect: "true"`)
 			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
@@ -117,7 +117,7 @@ var _ = Describe("controller", Ordered, func() {
 			// wait for login-protector
 			time.Sleep(testInterval)
 
-			// a PDB should not be created for not-target-sts-0 because it does not have the target label (`login-protector.cybozu.io/target: "true"`)
+			// a PDB should not be created for not-target-sts-0 because it does not have the target label (`login-protector.cybozu.io/protect: "true"`)
 			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
