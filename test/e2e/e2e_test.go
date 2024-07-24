@@ -2,32 +2,28 @@ package e2e
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/creack/pty"
 	"github.com/cybozu-go/login-protector/test/utils"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 const namespace = "login-protector-system"
 
 var _ = Describe("controller", Ordered, func() {
-	BeforeAll(func() {
-	})
-
-	AfterAll(func() {
-	})
-
 	Context("Operator", func() {
 		It("should run successfully", func() {
 			By("validating that the controller-manager pod is running as expected")
-			verifyControllerUp := func() error {
+			Eventually(func() error {
 				// Get pod name
 				pods := &corev1.PodList{}
 				err := utils.GetResource(namespace, "", pods, "-l", "control-plane=controller-manager")
@@ -43,9 +39,7 @@ var _ = Describe("controller", Ordered, func() {
 					return fmt.Errorf("controller pod in %s status", controllerPod.Status.Phase)
 				}
 				return nil
-			}
-			EventuallyWithOffset(1, verifyControllerUp, time.Minute, time.Second).Should(Succeed())
-
+			}).Should(Succeed())
 		})
 
 		It("should deploy target StatefulSet", func() {
@@ -162,6 +156,83 @@ var _ = Describe("controller", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(pod.Status.ContainerStatuses[0].Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
 			}).Should(Succeed())
+		})
+
+		getMetrics := func(url string) []string {
+			resp, err := http.Get(url)
+			ExpectWithOffset(1, err).ShouldNot(HaveOccurred())
+			defer resp.Body.Close()
+			ExpectWithOffset(1, resp.StatusCode).Should(Equal(http.StatusOK))
+			buf, err := io.ReadAll(resp.Body)
+			ExpectWithOffset(1, err).ShouldNot(HaveOccurred())
+			result := strings.Split(string(buf), "\n")
+			return result
+		}
+
+		It("should export metrics", func() {
+			By("prepare to access metrics endpoint")
+			pods := &corev1.PodList{}
+			err := utils.GetResource(namespace, "", pods, "-l", "control-plane=controller-manager")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pods.Items).Should(HaveLen(1))
+
+			cmd := exec.Command("kubectl", "port-forward", "-n", namespace, pods.Items[0].Name, "8080:8080")
+			go func() {
+				err = cmd.Run()
+				if err != nil {
+					panic(err)
+				}
+			}()
+			time.Sleep(1 * time.Second) // wait for port-forward to be ready
+			defer cmd.Process.Kill()
+
+			// make sure all metrics are "0"
+			metrics := getMetrics("http://localhost:8080/metrics")
+			Expect(metrics).Should(ContainElements(
+				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 0",
+				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
+				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 0",
+				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
+			))
+
+			ptmx, err := pty.Start(exec.Command("bash"))
+			Expect(err).NotTo(HaveOccurred())
+			defer ptmx.Close()
+
+			// login to target-sts-0 Pod using `kubectl exec`
+			go func() {
+				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 2*testIntervalSeconds+2))
+				if err != nil {
+					panic(err)
+				}
+			}()
+
+			// wait for login-protector to create PDB
+			time.Sleep(testInterval)
+
+			// make sure protecting metrics for target-sts-0 is "1"
+			metrics = getMetrics("http://localhost:8080/metrics")
+			Expect(metrics).Should(ContainElements(
+				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 1",
+				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
+				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 0",
+				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
+			))
+
+			// update container image of target-sts
+			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-dev:22.04")
+			Expect(err).NotTo(HaveOccurred())
+
+			time.Sleep(testInterval)
+
+			// make sure pending metrics for target-sts-0 is "1"
+			metrics = getMetrics("http://localhost:8080/metrics")
+			Expect(metrics).Should(ContainElements(
+				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 1",
+				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
+				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 1",
+				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
+			))
 		})
 	})
 })

@@ -49,7 +49,7 @@ func (u *StatefulSetUpdater) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	target := sts.Labels[common.LabelKeyLoginProtectorProtect]
-	if target != "true" {
+	if target != common.ValueTrue {
 		logger.Info("the statefulset is not a target of login protector")
 		return ctrl.Result{}, nil
 	}

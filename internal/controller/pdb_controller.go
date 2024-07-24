@@ -64,7 +64,7 @@ func (r *PDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 	noPDB := false
 	if noPDBStr, ok := sts.Annotations[common.AnnotationKeyNoPDB]; ok {
-		noPDB = noPDBStr == "true"
+		noPDB = noPDBStr == common.ValueTrue
 	}
 
 	errorList := make([]error, 0)
@@ -91,7 +91,7 @@ func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, expor
 	}
 
 	if val, ok := pod.Annotations[common.AnnotationKeyNoPDB]; ok {
-		noPDB = noPDB || (val == "true")
+		noPDB = noPDB || (val == common.ValueTrue)
 	}
 	if noPDB {
 		pdb := &policyv1.PodDisruptionBudget{}
