@@ -7,89 +7,153 @@
 
 **Project Status**: Initial development
 
-// TODO(user): Add simple overview of use/purpose
-
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
 
-## Getting Started
+login-protector provides a feature to prevent the reboot of Pods that are logged in within a Kubernetes cluster.
 
-### Prerequisites
-- go version v1.21.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+## Background
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+In Kubernetes clusters, Pods are sometimes used as bastion servers for operations.
+When these Pods are rebooted, the logged-in session is disconnected, causing operational interruptions.
+login-protector prevents this by ensuring that logged-in Pods are not rebooted.
 
-```sh
-make docker-build docker-push IMG=<some-registry>/login-protector:tag
-```
+## How It Works
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+login-protector checks if the processes in the target Pod are using TTY to determine if the Pod is logged in.
+If a Pod is found to be logged in, login-protector generates a PodDisruptionBudget with `maxUnavailable: 0` to prevent the Pod from being evicted.
+This ensures that the Pod is not rebooted during maintenance or upgrades when a Kubernetes Node is drained.
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+Additionally, login-protector can prevent the container image or PodTemplate of logged-in Pods from being updated.
+To achieve this, the Pods targeted by login-protector must be created by a StatefulSet with the updateStrategy set to OnDelete.
 
-```sh
-make deploy IMG=<some-registry>/login-protector:tag
-```
+To avoid issues with long-term Pod logins blocking necessary Node reboots or Pod updates, it is advisable to set up alert checks for prolonged logins.
+Furthermore, the PodDisruptionBudget can be disabled by adding an annotation to force a Pod reboot.
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+## Installation:
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+Run the following command to install login-protector:
 
 ```sh
-kubectl apply -k config/samples/
+kubectl apply -f https://github.com/cybozu-go/login-protector/releases/download/v0.1.0/login-protector.yaml
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+## Usage:
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+login-protector targets only StatefulSets. The StatefulSet should be configured as follows:
 
-```sh
-kubectl delete -k config/samples/
+1. Add the label `login-protector.cybozu.io/protect: "true"` to the StatefulSet.
+2. Add the sidecar container `ghcr.io/cybozu-go/tty-exporter` and specify `shareProcessNamespace: true`.
+3. Set the `updateStrategy` to `type: OnDelete`.
+
+
+Example manifest:
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: target-sts
+  labels:
+    login-protector.cybozu.io/protect: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: target-sts
+  serviceName: target-sts
+  template:
+    metadata:
+      labels:
+        name: target-sts
+    spec:
+      containers:
+      - name: main
+        image: ghcr.io/cybozu/ubuntu:22.04
+        imagePullPolicy: IfNotPresent
+        command: [ "sleep", "infinity" ]
+      - name: tty-exporter
+        image: ghcr.io/cybozu-go/tty-exporter:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: sidecar
+          containerPort: 8080
+      shareProcessNamespace: true
+  updateStrategy:
+    type: OnDelete
 ```
 
-**UnDeploy the controller from the cluster:**
+## Annotations
 
-```sh
-make undeploy
+Annotations can be used to modify the behavior of login-protector for the target StatefulSet:
+
+- `login-protector.cybozu.io/exporter-name`: Specify the name of the tty-exporter sidecar container. Default is "tty-exporter".
+- `login-protector.cybozu.io/exporter-port`: Specify the port of the tty-exporter sidecar container. Default is "8080".
+- `login-protector.cybozu.io/no-pdb`: Set to "true" to prevent the creation of a PodDisruptionBudget.
+
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: target-sts
+  labels:
+    login-protector.cybozu.io/protect: "true"
+  annotations:
+    login-protector.cybozu.io/exporter-name: sidecar
+    login-protector.cybozu.io/exporter-port: "9090"
+    login-protector.cybozu.io/no-pdb: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: target-sts
+  serviceName: target-sts
+  template:
+    metadata:
+      labels:
+        name: target-sts
+    spec:
+      containers:
+        - name: main
+          image: ghcr.io/cybozu/ubuntu:22.04
+          imagePullPolicy: IfNotPresent
+          command: [ "sleep", "infinity" ]
+        - name: sidecar
+          image: ghcr.io/cybozu-go/tty-exporter:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: sidecar
+              containerPort: 9090
+      shareProcessNamespace: true
+  updateStrategy:
+    type: OnDelete
 ```
 
-## Project Distribution
+## Development
 
-Following are the steps to build the installer and distribute this project to users.
+Install Golang, Docker, Make, and aqua beforehand.
 
-1. Build the installer for the image built and published in the registry:
+```bash
+# Install necessary tools.
+make setup
 
-```sh
-make build-installer IMG=<some-registry>/login-protector:tag
+# Start a test Kubernetes cluster.
+make start-dev
+
+# Start development with Tilt.
+tilt up
 ```
 
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
+Access the Tilt dashboard at http://localhost:10350.
+Changes to the source code or manifests will be automatically reflected.
 
-2. Using the installer
 
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
+## Release Process
 
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/login-protector/<tag or branch>/dist/install.yaml
-```
+T.B.D.
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+## License
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Apache License 2.0
 
 [releases]: https://github.com/cybozu-go/login-protector/releases
