@@ -14,6 +14,6 @@ func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	fmt.Fprintf(GinkgoWriter, "Starting login-protector suite\n")
 	SetDefaultEventuallyTimeout(30 * time.Second)
-	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
+	SetDefaultEventuallyPollingInterval(1 * time.Second)
 	RunSpecs(t, "e2e suite")
 }

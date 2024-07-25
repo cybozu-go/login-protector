@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // StatefulSetUpdater reconciles a StatefulSet object
@@ -39,18 +38,18 @@ func (u *StatefulSetUpdater) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if sts.DeletionTimestamp != nil {
-		logger.Info("the statefulset is being deleted")
+		logger.Info("StatefulSet is being deleted")
 		return ctrl.Result{}, nil
 	}
 
 	if sts.Spec.UpdateStrategy.Type != appsv1.OnDeleteStatefulSetStrategyType {
-		logger.Info("the statefulset is not using OnDelete update strategy")
+		logger.Info("StatefulSet is not using `OnDelete` update strategy")
 		return ctrl.Result{}, nil
 	}
 
 	target := sts.Labels[common.LabelKeyLoginProtectorProtect]
 	if target != common.ValueTrue {
-		logger.Info("the statefulset is not a target of login protector")
+		logger.Info("StatefulSet is not a target")
 		return ctrl.Result{}, nil
 	}
 
@@ -81,7 +80,7 @@ func (u *StatefulSetUpdater) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (u *StatefulSetUpdater) evictPod(ctx context.Context, sts *appsv1.StatefulSet) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Get pods that belong to the statefulset
+	// Get pods that belong to the StatefulSet
 	pods := &corev1.PodList{}
 	if err := u.Client.List(ctx, pods, client.InNamespace(sts.Namespace), client.MatchingLabels(sts.Spec.Selector.MatchLabels)); err != nil {
 		logger.Error(err, "failed to list pods")
@@ -112,22 +111,9 @@ func (u *StatefulSetUpdater) evictPod(ctx context.Context, sts *appsv1.StatefulS
 			pod = &p
 			break
 		}
-		logger.Info("running pod found", "pod", p.Name, "namespace", p.Namespace)
 	}
 	if pod == nil {
-		allPodsAreRunning := true
-		for _, p := range pods.Items {
-			if p.Status.Phase != corev1.PodRunning {
-				allPodsAreRunning = false
-				break
-			}
-		}
-		if allPodsAreRunning {
-			pod = &outdatedPods[0]
-		} else {
-			logger.Info("some pods are not running, waiting for them to be running")
-			return true, nil
-		}
+		pod = &outdatedPods[0]
 	}
 
 	logger.Info("evict outdated pod", "pod", pod.Name, "namespace", pod.Namespace)
@@ -150,39 +136,10 @@ func (u *StatefulSetUpdater) evictPod(ctx context.Context, sts *appsv1.StatefulS
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (u *StatefulSetUpdater) SetupWithManager(mgr ctrl.Manager) error {
-	targetStsPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      common.LabelKeyLoginProtectorProtect,
-			Operator: metav1.LabelSelectorOpExists,
-		}},
-	})
-	if err != nil {
-		return err
-	}
-	targetPodPredicate := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		// get owner
-		owner := metav1.GetControllerOf(o)
-		if owner == nil {
-			return false
-		}
-		if owner.Kind != "StatefulSet" {
-			return false
-		}
-		// get sts
-		sts := &appsv1.StatefulSet{}
-		if err := u.Client.Get(context.Background(), client.ObjectKey{Namespace: o.GetNamespace(), Name: owner.Name}, sts); err != nil {
-			return false
-		}
-		// check if the sts has the specific labels
-		if _, ok := sts.Labels[common.LabelKeyLoginProtectorProtect]; !ok {
-			return false
-		}
-		return true
-	})
-
+func (u *StatefulSetUpdater) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.StatefulSet{}, builder.WithPredicates(targetStsPredicate)).
-		Owns(&corev1.Pod{}, builder.WithPredicates(targetPodPredicate)).
+		For(&appsv1.StatefulSet{}, builder.WithPredicates(selectTargetStatefulSetPredicate())).
+		Owns(&corev1.Pod{}, builder.WithPredicates(selectTargetPodPredicate(ctx, mgr.GetClient()))).
+		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(selectTargetPDBPredicate(ctx, mgr.GetClient()))).
 		Complete(u)
 }

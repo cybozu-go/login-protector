@@ -143,7 +143,11 @@ var _ = Describe("controller", Ordered, func() {
 				pod := &corev1.Pod{}
 				err := utils.GetResource("", "target-sts-0", pod)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(pod.Status.ContainerStatuses[0].Image).ShouldNot(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+				for _, c := range pod.Spec.Containers {
+					if c.Name == "main" {
+						g.Expect(c.Image).ShouldNot(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+					}
+				}
 			}).WithTimeout(testInterval).Should(Succeed())
 
 			// wait for the PDB to be deleted
@@ -154,7 +158,11 @@ var _ = Describe("controller", Ordered, func() {
 				pod := &corev1.Pod{}
 				err := utils.GetResource("", "target-sts-0", pod)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(pod.Status.ContainerStatuses[0].Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+				for _, c := range pod.Spec.Containers {
+					if c.Name == "main" {
+						g.Expect(c.Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+					}
+				}
 			}).Should(Succeed())
 		})
 

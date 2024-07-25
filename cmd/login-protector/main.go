@@ -98,12 +98,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
 	setupLog.Info("creating statefulset controller")
 	if err = (&controller.StatefulSetUpdater{
 		Client:    mgr.GetClient(),
 		ClientSet: kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Scheme:    mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
@@ -126,12 +127,11 @@ func main() {
 	if err = (&controller.PDBReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, ch); err != nil {
+	}).SetupWithManager(ctx, mgr, ch); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PDB")
 		os.Exit(1)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
 	setupLog.Info("creating metrics collector")
 	if err = controller.SetupMetrics(ctx, mgr.GetClient(), mgr.GetLogger().WithName("metrics-collector")); err != nil {
 		setupLog.Error(err, "unable to setup metrics")

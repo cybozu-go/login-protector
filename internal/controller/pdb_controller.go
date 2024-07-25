@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -174,7 +173,7 @@ func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, expor
 		}
 
 		zeroIntstr := intstr.FromInt32(0)
-		pdb := &policyv1.PodDisruptionBudget{
+		pdb = &policyv1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
@@ -204,18 +203,11 @@ func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, expor
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PDBReconciler) SetupWithManager(mgr ctrl.Manager, ch chan event.TypedGenericEvent[*appsv1.StatefulSet]) error {
-	targetStsPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      common.LabelKeyLoginProtectorProtect,
-			Operator: metav1.LabelSelectorOpExists,
-		}},
-	})
-	if err != nil {
-		return err
-	}
+func (r *PDBReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ch chan event.TypedGenericEvent[*appsv1.StatefulSet]) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.StatefulSet{}, builder.WithPredicates(targetStsPredicate)).
+		For(&appsv1.StatefulSet{}, builder.WithPredicates(selectTargetStatefulSetPredicate())).
+		Owns(&corev1.Pod{}, builder.WithPredicates(selectTargetPodPredicate(ctx, mgr.GetClient()))).
+		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(selectTargetPDBPredicate(ctx, mgr.GetClient()))).
 		WatchesRawSource(source.Channel(ch, &handler.TypedEnqueueRequestForObject[*appsv1.StatefulSet]{})).
 		Complete(r)
 }
