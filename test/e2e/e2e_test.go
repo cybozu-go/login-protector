@@ -80,25 +80,22 @@ var _ = Describe("controller", Ordered, func() {
 				}
 			}()
 
-			// wait for login-protector to create PDB
-			time.Sleep(testInterval)
+			Eventually(func(g Gomega) {
+				// a PDB should be created for target-sts-0 because it has the target label (`login-protector.cybozu.io/protect: "true"`)
+				err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
+				g.Expect(pdbList.Items[0].Name).Should(Equal("target-sts-0"))
+				g.Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal("target-sts-0"))
+			}).WithTimeout(testInterval).Should(Succeed())
 
-			// a PDB should be created for target-sts-0 because it has the target label (`login-protector.cybozu.io/protect: "true"`)
-			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
-			Expect(pdbList.Items[0].Name).Should(Equal("target-sts-0"))
-			Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal("target-sts-0"))
-
-			// wait for the PDB to be deleted
-			time.Sleep(testInterval)
-
-			// the PDB should be deleted after the logout from the Pod
-			fmt.Println("PDB should be deleted")
-			pdbList = &policyv1.PodDisruptionBudgetList{}
-			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+			Eventually(func(g Gomega) {
+				// the PDB should be deleted after the logout from the Pod
+				pdbList = &policyv1.PodDisruptionBudgetList{}
+				err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+			}).WithTimeout(testInterval * 2).Should(Succeed())
 
 			// login to not-target-sts-0 Pod using `kubectl exec`
 			go func() {
@@ -108,13 +105,12 @@ var _ = Describe("controller", Ordered, func() {
 				}
 			}()
 
-			// wait for login-protector
-			time.Sleep(testInterval)
-
-			// a PDB should not be created for not-target-sts-0 because it does not have the target label (`login-protector.cybozu.io/protect: "true"`)
-			err = utils.GetResource("", "", pdbList, "--ignore-not-found")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+			Consistently(func(g Gomega) {
+				// a PDB should not be created for not-target-sts-0 because it does not have the target label (`login-protector.cybozu.io/protect: "true"`)
+				err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+			}).WithTimeout(testInterval).Should(Succeed())
 		})
 
 		It("should stop updating the target statefulset", func() {
@@ -131,8 +127,13 @@ var _ = Describe("controller", Ordered, func() {
 				}
 			}()
 
-			// wait for login-protector to create PDB
-			time.Sleep(testInterval)
+			Eventually(func(g Gomega) {
+				// a PDB should be created for target-sts-0
+				pdbList := &policyv1.PodDisruptionBudgetList{}
+				err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
+			}).WithTimeout(testInterval).Should(Succeed())
 
 			// update container image of target-sts
 			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-debug:22.04")
@@ -150,8 +151,13 @@ var _ = Describe("controller", Ordered, func() {
 				}
 			}).WithTimeout(testInterval).Should(Succeed())
 
-			// wait for the PDB to be deleted
-			time.Sleep(testInterval)
+			Eventually(func(g Gomega) {
+				// the PDB should be deleted after the logout from the Pod
+				pdbList := &policyv1.PodDisruptionBudgetList{}
+				err = utils.GetResource("", "", pdbList, "--ignore-not-found")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pdbList.Items).Should(BeEmpty(), "unexpected pdb exists")
+			}).WithTimeout(testInterval * 2).Should(Succeed())
 
 			// make sure the container image is updated
 			Eventually(func(g Gomega) {
@@ -163,7 +169,7 @@ var _ = Describe("controller", Ordered, func() {
 						g.Expect(c.Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
 					}
 				}
-			}).Should(Succeed())
+			}).WithTimeout(testInterval).Should(Succeed())
 		})
 
 		getMetrics := func(url string) []string {
@@ -194,14 +200,16 @@ var _ = Describe("controller", Ordered, func() {
 			time.Sleep(1 * time.Second) // wait for port-forward to be ready
 			defer cmd.Process.Kill()
 
-			// make sure all metrics are "0"
-			metrics := getMetrics("http://localhost:8080/metrics")
-			Expect(metrics).Should(ContainElements(
-				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 0",
-				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
-				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 0",
-				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
-			))
+			Eventually(func(g Gomega) {
+				// make sure all metrics are "0"
+				metrics := getMetrics("http://localhost:8080/metrics")
+				g.Expect(metrics).Should(ContainElements(
+					"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 0",
+					"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
+					"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 0",
+					"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
+				))
+			}).WithTimeout(testInterval).Should(Succeed())
 
 			ptmx, err := pty.Start(exec.Command("bash"))
 			Expect(err).NotTo(HaveOccurred())
@@ -215,32 +223,31 @@ var _ = Describe("controller", Ordered, func() {
 				}
 			}()
 
-			// wait for login-protector to create PDB
-			time.Sleep(testInterval)
-
-			// make sure protecting metrics for target-sts-0 is "1"
-			metrics = getMetrics("http://localhost:8080/metrics")
-			Expect(metrics).Should(ContainElements(
-				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 1",
-				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
-				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 0",
-				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
-			))
+			Eventually(func(g Gomega) {
+				// make sure protecting metrics for target-sts-0 is "1"
+				metrics := getMetrics("http://localhost:8080/metrics")
+				g.Expect(metrics).Should(ContainElements(
+					"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 1",
+					"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
+					"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 0",
+					"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
+				))
+			}).WithTimeout(testInterval).Should(Succeed())
 
 			// update container image of target-sts
 			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-dev:22.04")
 			Expect(err).NotTo(HaveOccurred())
 
-			time.Sleep(testInterval)
-
-			// make sure pending metrics for target-sts-0 is "1"
-			metrics = getMetrics("http://localhost:8080/metrics")
-			Expect(metrics).Should(ContainElements(
-				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 1",
-				"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
-				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 1",
-				"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
-			))
+			Eventually(func(g Gomega) {
+				// make sure pending metrics for target-sts-0 is "1"
+				metrics := getMetrics("http://localhost:8080/metrics")
+				g.Expect(metrics).Should(ContainElements(
+					"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-0\"} 1",
+					"login_protector_pod_protecting{namespace=\"default\",pod=\"target-sts-1\"} 0",
+					"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-0\"} 1",
+					"login_protector_pod_pending_updates{namespace=\"default\",pod=\"target-sts-1\"} 0",
+				))
+			}).WithTimeout(testInterval * 2).Should(Succeed())
 		})
 	})
 })
