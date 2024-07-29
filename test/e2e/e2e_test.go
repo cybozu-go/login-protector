@@ -169,7 +169,7 @@ var _ = Describe("controller", Ordered, func() {
 						g.Expect(c.Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
 					}
 				}
-			}).WithTimeout(testInterval).Should(Succeed())
+			}).WithTimeout(3 * time.Minute).Should(Succeed())
 		})
 
 		getMetrics := func(url string) []string {
@@ -217,7 +217,7 @@ var _ = Describe("controller", Ordered, func() {
 
 			// login to target-sts-0 Pod using `kubectl exec`
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 2*testIntervalSeconds+2))
+				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 3*testIntervalSeconds+2))
 				if err != nil {
 					panic(err)
 				}

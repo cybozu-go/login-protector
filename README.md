@@ -133,6 +133,11 @@ spec:
 
 Install Golang, Docker, Make, and aqua beforehand.
 
+### With Tilt
+
+[Tilt](https://tilt.dev/) is a local development tool that makes it easy to develop applications for Kubernetes.
+You can use Tilt to automatically build and deploy login-protector.
+
 ```bash
 # Install necessary tools.
 make setup
@@ -147,6 +152,26 @@ tilt up
 Access the Tilt dashboard at http://localhost:10350.
 Changes to the source code or manifests will be automatically reflected.
 
+### Without Tilt
+
+If you don't want to use Tilt, you can use the following commands:
+
+```bash
+# Install necessary tools.
+make setup
+
+# Start a test Kubernetes cluster.
+make start-kind
+
+# Load container images.
+make load-image
+
+# Deploy login-protector.
+make deploy
+
+# Deploy test StatefulSets.
+kubectl apply -f ./test/testdata/statefulset.yaml
+```
 
 ## Release Process
 
