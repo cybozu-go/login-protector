@@ -3,8 +3,11 @@ package tty_exporter
 import (
 	"errors"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/cybozu-go/login-protector/internal/common"
 )
@@ -33,7 +36,8 @@ func getTTYStatus() (*common.TTYStatus, error) {
 					return nil
 				}
 			}
-			statBytes, err := os.ReadFile(filepath.Join("/proc", name, "stat"))
+			statFilePath := filepath.Join("/proc", name, "stat")
+			statBytes, err := os.ReadFile(statFilePath)
 			if err != nil {
 				return err
 			}
@@ -42,6 +46,22 @@ func getTTYStatus() (*common.TTYStatus, error) {
 			fields := strings.Split(stat, " ")
 			if len(fields) <= 6 {
 				return errProcStat
+			}
+
+			// Get the owner of the process
+			info, err := os.Stat(statFilePath)
+			if err != nil {
+				return err
+			}
+			owner := "unknown"
+			if st, ok := info.Sys().(*syscall.Stat_t); ok {
+				uid := strconv.Itoa(int(st.Uid))
+				u, err := user.LookupId(uid)
+				if err != nil {
+					owner = uid
+				} else {
+					owner = u.Username
+				}
 			}
 
 			// The 1st (0-origin) field is the filename of the executable enclosed in parentheses.
@@ -53,6 +73,7 @@ func getTTYStatus() (*common.TTYStatus, error) {
 				p := common.Process{
 					PID:     name,
 					Command: tcomm,
+					User:    owner,
 				}
 				res.Total++
 				res.Processes = append(res.Processes, p)

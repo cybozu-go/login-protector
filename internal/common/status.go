@@ -6,6 +6,8 @@ type Process struct {
 	PID string `json:"pid"`
 	// Command represents the filename of the executable
 	Command string `json:"command"`
+	// User represents the username of the process owner
+	User string `json:"user"`
 }
 
 // TTYStatus represents the TTY status information
