@@ -177,14 +177,6 @@ func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, expor
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: "v1",
-						Kind:       "Pod",
-						Name:       pod.GetName(),
-						UID:        pod.GetUID(),
-					},
-				},
 			},
 			Spec: policyv1.PodDisruptionBudgetSpec{
 				Selector: &metav1.LabelSelector{
@@ -192,6 +184,11 @@ func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, expor
 				},
 				MaxUnavailable: &zeroIntstr,
 			},
+		}
+		err = ctrl.SetControllerReference(pod, pdb, r.Scheme)
+		if err != nil {
+			logger.Error(err, "failed to set controller reference")
+			return err
 		}
 		logger.Info("crate a new PDB", "pdb", pdb, "pod", pod.Name, "namespace", pod.Namespace)
 		err = r.Client.Create(ctx, pdb)

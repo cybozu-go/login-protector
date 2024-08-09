@@ -14,7 +14,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // StatefulSetUpdater reconciles a StatefulSet object
@@ -140,6 +142,6 @@ func (u *StatefulSetUpdater) SetupWithManager(ctx context.Context, mgr ctrl.Mana
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}, builder.WithPredicates(selectTargetStatefulSetPredicate())).
 		Owns(&corev1.Pod{}, builder.WithPredicates(selectTargetPodPredicate(ctx, mgr.GetClient()))).
-		Owns(&policyv1.PodDisruptionBudget{}, builder.WithPredicates(selectTargetPDBPredicate(ctx, mgr.GetClient()))).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &policyv1.PodDisruptionBudget{}, handler.TypedEnqueueRequestsFromMapFunc(requestFromPDBFunc(mgr.GetClient())))).
 		Complete(u)
 }

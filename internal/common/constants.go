@@ -6,3 +6,5 @@ const AnnotationKeyExporterName = "login-protector.cybozu.io/exporter-name"
 const AnnotationKeyExporterPort = "login-protector.cybozu.io/exporter-port"
 
 const ValueTrue = "true"
+const KindStatefulSet = "StatefulSet"
+const KindPod = "Pod"
