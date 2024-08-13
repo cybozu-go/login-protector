@@ -215,6 +215,14 @@ var _ = Describe("controller", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer ptmx.Close()
 
+			// Wait for target-sts-0 Pod to be running
+			Eventually(func(g Gomega) {
+				var pod corev1.Pod
+				err := utils.GetResource("", "target-sts-0", &pod)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pod.Status.Phase).Should(Equal(corev1.PodRunning))
+			}).Should(Succeed())
+
 			// login to target-sts-0 Pod using `kubectl exec`
 			go func() {
 				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 3*testIntervalSeconds+2))
