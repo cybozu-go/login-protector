@@ -131,7 +131,7 @@ spec:
 
 ## Development
 
-Install Golang, Docker, Make, and aqua beforehand.
+Install Golang, Docker, Make, and [aqua](https://aquaproj.github.io/docs/install) beforehand.
 
 ### With Tilt
 
@@ -168,10 +168,65 @@ make load-image
 
 # Deploy login-protector.
 make deploy
+```
 
-# Deploy test StatefulSets.
+### Demo
+
+After deploying login-protector, you can test it with the following steps:
+
+#### 1. Deploy a test StatefulSet
+
+Deploy a test StatefulSet with the following command:
+
+```bash
 kubectl apply -f ./test/testdata/statefulset.yaml
 ```
+
+#### 2. Log in to the test Pod
+
+Log in to the test Pod with the following command:
+
+```bash
+kubectl exec -it target-sts-0 bash
+```
+
+#### 3. Evict the test Pod
+
+To evict the test Pod, you can use [kubectl-evict](https://github.com/ueokande/kubectl-evict).
+Install kubectl-evict with the following command:
+
+```bash
+go install github.com/ueokande/kubectl-evict@latest
+```
+
+Then, evict the test Pod with the following command:
+
+```bash
+kubectl evict target-sts-0
+```
+
+The test Pod should not be evicted because it is logged in.
+
+#### 4. Update the container image of the test Pod
+
+Update the container image of the test Pod with the following command:
+
+```bash
+kubectl set image sts/target-sts main=ghcr.io/cybozu/ubuntu-debug:22.04
+```
+
+The container image of the test Pod should not be updated because it is logged in.
+
+#### 5. Log out of the test Pod
+
+Log out of the test Pod with the following command:
+
+```bash
+exit
+```
+
+The container image of the test Pod should be updated because it is no longer logged in.
+
 
 ## Release Process
 
