@@ -53,8 +53,8 @@ jobs:
         run: |
           PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ inputs.tag }} make build-installer
           git checkout config/manager/kustomization.yaml
-          git add ./dist/install.yaml
           if ! git diff --exit-code --quiet; then
+            git add ./dist/install.yaml
             git commit -m "Generate install.yaml for login-protector v${{ inputs.tag }}"
             git push
           fi
@@ -64,4 +64,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create v${{ inputs.tag }} --title "Release login-protector v${{ inputs.tag }}" --generate-notes
+          gh release create v${{ inputs.tag }} --title "Release v${{ inputs.tag }}" --generate-notes
