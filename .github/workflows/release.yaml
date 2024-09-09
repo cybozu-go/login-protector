@@ -1,0 +1,51 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        required: true
+        description: The name of the tag to release
+jobs:
+  release:
+    name: Release login-protector
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}:{{ inputs.tag }}
+          labels: org.opencontainers.image.source=${{ github.repository }}
+      - name: Setup Git Config
+        run: |
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
+      - name: Generate install.yaml and push tag
+        run: |
+          PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ inputs.tag }} make build-installer
+          git add ./dist/install.yaml
+          if ! git diff --exit-code --quiet; then
+            git commit -m "Generate install.yaml for login-protector v${{ inputs.tag }}"
+            git push
+          fi
+          git tag -a v${{ inputs.tag }} -m "Release login-protector v${{ inputs.tag }}"
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ inputs.tag }} --title "Release login-protector v${{ inputs.tag }}" --generate-notes
