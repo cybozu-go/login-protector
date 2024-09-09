@@ -162,7 +162,7 @@ spec:
         - --leader-elect
         command:
         - /login-protector
-        image: login-protector:dev
+        image: ghcr.io/cybozu-go/login-protector:0.0.1
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
