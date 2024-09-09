@@ -137,4 +137,4 @@ undeploy: setup ## Undeploy controller from the K8s cluster specified in ~/.kube
 ##@ Setup
 
 setup:
-	aqua install
+	aqua install -l
