@@ -36,14 +36,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and Push
+      - name: Build and Push login-protector
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ inputs.tag }}
-          labels: org.opencontainers.image.source=${{ github.repository }}
+          tags: ghcr.io/login-protector:${{ inputs.tag }}
+          target: login-protector
+      - name: Build and Push tty-exporter
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/tty-exporter:${{ inputs.tag }}
+          target: tty-exporter
       - name: Setup Git Config
         run: |
           git config --global user.name github-actions
