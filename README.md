@@ -34,7 +34,7 @@ Furthermore, the PodDisruptionBudget can be disabled by adding an annotation to 
 Run the following command to install login-protector:
 
 ```sh
-kubectl apply -f https://github.com/cybozu-go/login-protector/releases/download/v0.1.0/login-protector.yaml
+curl -fsL https://github.com/cybozu-go/login-protector/releases/latest/download/install.yaml | kubectl apply -f -
 ```
 
 ## Usage:
