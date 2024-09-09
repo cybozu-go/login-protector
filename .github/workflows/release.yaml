@@ -39,6 +39,7 @@ jobs:
           git config --global user.name github-actions
           git config --global user.email github-actions@github.com
       - name: Generate install.yaml and push tag
+        shell: bash -xe {0}
         run: |
           PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ inputs.tag }} make build-installer
           git add ./dist/install.yaml
