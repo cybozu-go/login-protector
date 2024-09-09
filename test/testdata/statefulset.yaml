@@ -1,0 +1,60 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: target-sts
+  labels:
+    login-protector.cybozu.io/protect: "true"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      name: target-sts
+  serviceName: target-sts
+  template:
+    metadata:
+      labels:
+        name: target-sts
+    spec:
+      containers:
+      - name: main
+        image: ghcr.io/cybozu/ubuntu:22.04
+        imagePullPolicy: IfNotPresent
+        command: [ "sleep", "infinity" ]
+      - name: tty-exporter
+        image: tty-exporter:dev
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: sidecar
+          containerPort: 8080
+      shareProcessNamespace: true
+  updateStrategy:
+    type: OnDelete
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: not-target-sts
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: not-target-sts
+  serviceName: not-target-sts
+  template:
+    metadata:
+      labels:
+        name: not-target-sts
+    spec:
+      containers:
+      - name: main
+        image: ghcr.io/cybozu/ubuntu:22.04
+        imagePullPolicy: IfNotPresent
+        command: [ "sleep", "infinity" ]
+      - name: tty-exporter
+        image: tty-exporter:dev
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: sidecar
+          containerPort: 8080
+      shareProcessNamespace: true

@@ -18,3 +18,5 @@
 # Generated files
 /bin
 /docs/book
+
+/vendor
