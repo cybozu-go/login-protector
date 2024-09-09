@@ -42,7 +42,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/login-protector:${{ inputs.tag }}
+          tags: ghcr.io/cybozu-go/login-protector:${{ inputs.tag }}
           target: login-protector
       - name: Build and Push tty-exporter
         uses: docker/build-push-action@v6
@@ -50,7 +50,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/tty-exporter:${{ inputs.tag }}
+          tags: ghcr.io/cybozu-go/tty-exporter:${{ inputs.tag }}
           target: tty-exporter
       - name: Setup Git Config
         run: |

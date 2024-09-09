@@ -22,7 +22,7 @@ spec:
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
       - name: tty-exporter
-        image: tty-exporter:dev
+        image: ghcr.io/cybozu-go/tty-exporter:0.0.1
         imagePullPolicy: IfNotPresent
         ports:
         - name: sidecar
@@ -52,7 +52,7 @@ spec:
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
       - name: tty-exporter
-        image: tty-exporter:dev
+        image: ghcr.io/cybozu-go/tty-exporter:0.0.1
         imagePullPolicy: IfNotPresent
         ports:
         - name: sidecar
