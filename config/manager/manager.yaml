@@ -35,7 +35,7 @@ spec:
         - /login-protector
         args:
         - --leader-elect
-        image: login-protector:dev
+        image: controller:latest
         imagePullPolicy: IfNotPresent
         name: manager
         securityContext:

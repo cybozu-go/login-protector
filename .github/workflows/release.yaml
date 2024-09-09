@@ -42,9 +42,9 @@ jobs:
         shell: bash -xe {0}
         run: |
           PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ inputs.tag }} make build-installer
+          git checkout config/manager/kustomization.yaml
           git add ./dist/install.yaml
           if ! git diff --exit-code --quiet; then
-            git checkout config/manager/kustomization.yaml
             git commit -m "Generate install.yaml for login-protector v${{ inputs.tag }}"
             git push
           fi
