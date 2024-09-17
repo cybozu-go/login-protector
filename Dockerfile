@@ -15,13 +15,13 @@ COPY internal/ internal/
 
 RUN CGO_ENABLED=0 go install -ldflags="-w -s" ./cmd/...
 
-# Build the tty-exporter binary
-FROM scratch AS tty-exporter
+# Build the local-session-tracker binary
+FROM scratch AS local-session-tracker
 LABEL org.opencontainers.image.source="https://github.com/cybozu-go/login-protector"
 
-COPY --from=build /go/bin/tty-exporter .
+COPY --from=build /go/bin/local-session-tracker .
 USER 10000:10000
-ENTRYPOINT ["/tty-exporter"]
+ENTRYPOINT ["/local-session-tracker"]
 
 # Build the login-protector binary
 FROM scratch AS login-protector

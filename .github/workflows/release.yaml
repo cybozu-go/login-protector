@@ -44,14 +44,14 @@ jobs:
           push: true
           tags: ghcr.io/cybozu-go/login-protector:${{ inputs.tag }},ghcr.io/cybozu-go/login-protector:latest
           target: login-protector
-      - name: Build and Push tty-exporter
+      - name: Build and Push local-session-tracker
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/cybozu-go/tty-exporter:${{ inputs.tag }},ghcr.io/cybozu-go/tty-exporter:latest
-          target: tty-exporter
+          tags: ghcr.io/cybozu-go/local-session-tracker:${{ inputs.tag }},ghcr.io/cybozu-go/local-session-tracker:latest
+          target: local-session-tracker
       - name: Setup Git Config
         run: |
           git config --global user.name github-actions

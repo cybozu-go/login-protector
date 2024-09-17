@@ -1,6 +1,6 @@
 # Image URL to use all building/pushing image targets
 PROTECTOR_IMG ?= login-protector:dev
-EXPORTER_IMG ?= tty-exporter:dev
+TRACKER_IMG ?= local-session-tracker:dev
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -83,17 +83,17 @@ run: manifests fmt vet ## Run a controller from your host.
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${PROTECTOR_IMG} . --target=login-protector
-	$(CONTAINER_TOOL) build -t ${EXPORTER_IMG} . --target=tty-exporter
+	$(CONTAINER_TOOL) build -t ${TRACKER_IMG} . --target=local-session-tracker
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${PROTECTOR_IMG}
-	$(CONTAINER_TOOL) push ${EXPORTER_IMG}
+	$(CONTAINER_TOOL) push ${TRACKER_IMG}
 
 .PHONY: load-image
 load-image: docker-build setup
 	kind load docker-image ${PROTECTOR_IMG}
-	kind load docker-image ${EXPORTER_IMG}
+	kind load docker-image ${TRACKER_IMG}
 
 
 .PHONY: build-installer
