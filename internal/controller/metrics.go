@@ -27,6 +27,15 @@ var (
 		metricsNamespace+"_pod_protecting",
 		"Describes whether the pod is being protected.",
 		[]string{"pod", "namespace"}, nil)
+
+	watcherErrorsCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: metricsNamespace,
+			Name:      "watcher_errors_total",
+			Help:      "Number of errors occurred in watchers.",
+		},
+		[]string{"watcher"},
+	)
 )
 
 type metricsCollector struct {
@@ -38,6 +47,7 @@ type metricsCollector struct {
 func (c *metricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- pendingUpdatesDesc
 	ch <- protectingPodsDesc
+	watcherErrorsCounter.Describe(ch)
 }
 
 func (c *metricsCollector) Collect(ch chan<- prometheus.Metric) {
@@ -89,6 +99,7 @@ func (c *metricsCollector) Collect(ch chan<- prometheus.Metric) {
 			)
 		}
 	}
+	watcherErrorsCounter.Collect(ch)
 }
 
 func SetupMetrics(ctx context.Context, c client.Client, logger logr.Logger) error {

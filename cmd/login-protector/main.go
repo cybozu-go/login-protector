@@ -11,7 +11,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/cybozu-go/login-protector/internal/controller"
-	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -109,26 +109,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("creating tty watcher")
-	ch := make(chan event.TypedGenericEvent[*appsv1.StatefulSet])
-	watcher := controller.NewTTYWatcher(
+	setupLog.Info("creating local session watcher")
+	ch := make(chan event.TypedGenericEvent[*corev1.Pod])
+	watcher := controller.NewLocalSessionWatcher(
 		mgr.GetClient(),
-		mgr.GetLogger().WithName("TTYWatcher"),
+		mgr.GetLogger().WithName("LocalSessionWatcher"),
 		ttyCheckInterval,
 		ch,
 	)
 	err = mgr.Add(watcher)
 	if err != nil {
-		setupLog.Error(err, "unable to add runnable", "controller", "PDB")
+		setupLog.Error(err, "unable to add runnable", "runnable", "LocalSessionWatcher")
 		os.Exit(1)
 	}
 
-	setupLog.Info("creating pdb controller")
-	if err = (&controller.PDBReconciler{
+	setupLog.Info("creating pod controller")
+	if err = (&controller.PodReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(ctx, mgr, ch); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PDB")
+		setupLog.Error(err, "unable to create controller", "controller", "Pod")
 		os.Exit(1)
 	}
 

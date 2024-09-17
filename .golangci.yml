@@ -18,7 +18,9 @@ issues:
         - lll
     - path: "test/*"
       linters:
+        - dupl
         - errcheck
+        - lll
 linters:
   disable-all: true
   enable:
