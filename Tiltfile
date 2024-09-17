@@ -15,9 +15,6 @@ CMD ["/local-session-tracker"]
 # Generate manifests
 local_resource('make manifests', "make manifests", deps=["api", "controllers", "hooks"], ignore=['*/*/zz_generated.deepcopy.go'])
 
-# Don't watch generated files
-watch_settings(ignore=['config/rbac/role.yaml'])
-
 # Deploy login-protector
 watch_file('./config/')
 k8s_yaml(kustomize('./config/dev'))

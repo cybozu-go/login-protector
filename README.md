@@ -45,7 +45,6 @@ login-protector targets only StatefulSets. The StatefulSet should be configured 
 2. Add the sidecar container `ghcr.io/cybozu-go/local-session-tracker` and specify `shareProcessNamespace: true`.
 3. Set the `updateStrategy` to `type: OnDelete`.
 
-
 Example manifest:
 
 ```yaml
@@ -88,8 +87,6 @@ Annotations can be used to modify the behavior of login-protector for the target
 
 - `login-protector.cybozu.io/tracker-name`: Specify the name of the local-session-tracker sidecar container. Default is "local-session-tracker".
 - `login-protector.cybozu.io/tracker-port`: Specify the port of the local-session-tracker sidecar container. Default is "8080".
-- `login-protector.cybozu.io/no-pdb`: Set to "true" to prevent the creation of a PodDisruptionBudget.
-
 
 ```yaml
 apiVersion: apps/v1
@@ -101,7 +98,6 @@ metadata:
   annotations:
     login-protector.cybozu.io/tracker-name: sidecar
     login-protector.cybozu.io/tracker-port: "9090"
-    login-protector.cybozu.io/no-pdb: "true"
 spec:
   replicas: 1
   selector:
@@ -128,6 +124,24 @@ spec:
   updateStrategy:
     type: OnDelete
 ```
+
+The following annotation can be used to disable the creation of a PodDisruptionBudget for the target Pod:
+
+- `login-protector.cybozu.io/no-pdb`: Set to "true" to prevent the creation of a PodDisruptionBudget.
+
+If you want to force a Pod reboot, you can add the annotation to the target Pod:
+
+```console
+$ kubectl annotate pod target-sts-0 login-protector.cybozu.io/no-pdb=true
+```
+
+## Metrics
+
+login-protector provides the following metrics:
+
+- `login_protector_pod_pending_updates`: The number of Pods that have pending updates.
+- `login_protector_pod_protecting`: The number of Pods that are being protected.
+- `login_protector_watcher_errors_total`: The number of errors that occurred in the Pod watcher.
 
 ## Development
 
@@ -226,11 +240,6 @@ exit
 ```
 
 The container image of the test Pod should be updated because it is no longer logged in.
-
-
-## Release Process
-
-T.B.D.
 
 ## License
 
