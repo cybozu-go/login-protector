@@ -1,0 +1,11 @@
+resources:
+  - ../default
+patchesStrategicMerge:
+  - ./manager.yaml
+secretGenerator:
+  - name: teleport-api-token
+    namespace: login-protector-system
+    files:
+      - api-access.pem
+generatorOptions:
+  disableNameSuffixHash: true

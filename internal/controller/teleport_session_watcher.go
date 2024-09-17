@@ -16,20 +16,22 @@ import (
 )
 
 type TeleportSessionWatcher struct {
-	kubernetesClient client.Client
-	teleportClient   *teleport_client.Client
-	logger           logr.Logger
-	interval         time.Duration
-	channel          chan<- event.TypedGenericEvent[*corev1.Pod]
+	kubernetesClient  client.Client
+	teleportClient    *teleport_client.Client
+	logger            logr.Logger
+	teleportNamespace string
+	interval          time.Duration
+	channel           chan<- event.TypedGenericEvent[*corev1.Pod]
 }
 
-func NewTeleportSessionWatcher(kubernetesClient client.Client, teleportClient *teleport_client.Client, logger logr.Logger, interval time.Duration, ch chan<- event.TypedGenericEvent[*corev1.Pod]) *TeleportSessionWatcher {
+func NewTeleportSessionWatcher(kubernetesClient client.Client, teleportClient *teleport_client.Client, logger logr.Logger, teleportNamespace string, interval time.Duration, ch chan<- event.TypedGenericEvent[*corev1.Pod]) *TeleportSessionWatcher {
 	return &TeleportSessionWatcher{
-		kubernetesClient: kubernetesClient,
-		teleportClient:   teleportClient,
-		logger:           logger,
-		interval:         interval,
-		channel:          ch,
+		kubernetesClient:  kubernetesClient,
+		teleportClient:    teleportClient,
+		logger:            logger,
+		teleportNamespace: teleportNamespace,
+		interval:          interval,
+		channel:           ch,
 	}
 }
 
@@ -53,6 +55,7 @@ func (w *TeleportSessionWatcher) Start(ctx context.Context) error {
 }
 
 func (w *TeleportSessionWatcher) poll(ctx context.Context) error {
+	w.logger.Info("poll...")
 	var stsList appsv1.StatefulSetList
 	err := w.kubernetesClient.List(ctx, &stsList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{common.LabelKeyLoginProtectorProtect: common.ValueTrue}),
@@ -67,6 +70,7 @@ func (w *TeleportSessionWatcher) poll(ctx context.Context) error {
 		w.logger.Error(err, "failed to get teleport sessions")
 		return err
 	}
+	w.logger.Info("getTeleportSessions", "sessions", sessions)
 
 	errList := make([]error, 0)
 	// Get all pods that belong to the StatefulSets
@@ -120,6 +124,7 @@ func (w *TeleportSessionWatcher) getTeleportSessions(ctx context.Context) (map[s
 
 // notify notifies pod-controller that the login status has changed
 func (w *TeleportSessionWatcher) notify(ctx context.Context, sessions map[string][]TeleportSession, pod corev1.Pod) error {
+	w.logger.Info("notify...", "namespace", pod.Namespace, "pod", pod.Name)
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}

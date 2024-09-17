@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - command:
+            - /login-protector
+          args:
+            - --leader-elect
+            - --session-watcher=teleport
+            - --teleport-api-token=/etc/login-protector/api-access.pem
+            - --teleport-namespace=teleport
+            - --teleport-addrs=teleport-auth.teleport.svc.cluster.local:3025
+          name: manager
+          volumeMounts:
+            - mountPath: /etc/login-protector
+              name: api-token
+      volumes:
+        - name: api-token
+          secret:
+            secretName: teleport-api-token

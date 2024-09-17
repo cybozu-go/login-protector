@@ -17,3 +17,4 @@ packages:
 - name: golangci/golangci-lint@v1.59.0
 - name: tilt-dev/ctlptl@v0.8.29
 - name: tilt-dev/tilt@v0.33.17
+- name: helm/helm@v3.16.1

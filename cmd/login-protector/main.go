@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -47,6 +48,9 @@ func main() {
 	var enableHTTP2 bool
 	var sessionCheckInterval time.Duration
 	var sessionWatcher string
+	var teleportApiToken string
+	var teleportNamespace string
+	var teleportAddrs string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -58,6 +62,9 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.DurationVar(&sessionCheckInterval, "session-check-interval", 5*time.Second, "interval to check session")
 	flag.StringVar(&sessionWatcher, "session-watcher", "local", "session watcher to use (local or teleport)")
+	flag.StringVar(&teleportApiToken, "teleport-api-token", "", "The file path of Teleport API token")
+	flag.StringVar(&teleportNamespace, "teleport-namespace", "teleport", "The namespace of Teleport")
+	flag.StringVar(&teleportAddrs, "teleport-addrs", "teleport:3080,teleport-auth:3025,teleport:3024", "The comma-separated list of Teleport addresses")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -127,14 +134,22 @@ func main() {
 			ch,
 		)
 	case "teleport":
+		if teleportApiToken == "" {
+			setupLog.Error(nil, "teleport-api-token is required for teleport session watcher")
+			os.Exit(1)
+		}
+		if teleportNamespace == "" {
+			setupLog.Error(nil, "teleport-namespace is required for teleport session watcher")
+			os.Exit(1)
+		}
+		if teleportAddrs == "" {
+			setupLog.Error(nil, "teleport-addrs is required for teleport session watcher")
+			os.Exit(1)
+		}
 		teleportClient, err := teleport_client.New(ctx, teleport_client.Config{
-			Addrs: []string{
-				"localhost:3080",
-				"localhost:3025",
-				"localhost:3024",
-			},
+			Addrs: strings.Split(teleportAddrs, ","),
 			Credentials: []teleport_client.Credentials{
-				teleport_client.LoadIdentityFile("api-access.pem"),
+				teleport_client.LoadIdentityFile(teleportApiToken),
 			},
 		})
 
@@ -146,6 +161,7 @@ func main() {
 			mgr.GetClient(),
 			teleportClient,
 			mgr.GetLogger().WithName("TeleportSessionWatcher"),
+			teleportNamespace,
 			sessionCheckInterval,
 			ch,
 		)

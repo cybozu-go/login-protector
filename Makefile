@@ -136,5 +136,46 @@ undeploy: setup ## Undeploy controller from the K8s cluster specified in ~/.kube
 
 ##@ Setup
 
+.PHONY: setup
 setup:
 	aqua install -l
+
+##@ Teleport
+
+.PHONY: get-teleport-manifests
+get-teleport-manifests:
+	helm repo add teleport https://charts.releases.teleport.dev
+	helm repo update
+	helm template teleport --namespace teleport teleport/teleport-cluster \
+		--create-namespace \
+		--version 15.3.7 \
+		--values ./test/teleport/cluster/values.yaml \
+		> ./test/teleport/cluster/teleport-cluster.yaml
+
+.PHONY: setup-teleport-cli
+setup-teleport-cli:
+	rm -rf teleport
+	wget https://cdn.teleport.dev/teleport-v15.3.7-linux-amd64-bin.tar.gz
+	tar -xvf teleport-v15.3.7-linux-amd64-bin.tar.gz
+	rm teleport-v15.3.7-linux-amd64-bin.tar.gz
+
+.PHONY: deploy-teleport
+deploy-teleport:
+	# Setup Teleport Cluster
+	kubectl create namespace teleport
+	kustomize build ./test/teleport/cluster | kubectl apply -f -
+	kubectl -n teleport wait --for=condition=available --timeout=180s --all deployments
+
+	# Setup Teleport Node
+	TOKEN=$$(kubectl exec -it -n teleport deployment/teleport-auth -- tctl tokens add --type=node --format json | jq -r ".token") && \
+		sed -i "s/auth_token: .*/auth_token: $$TOKEN/g" ./test/teleport/node/teleport-secret.yaml
+	kustomize build ./test/teleport/node | kubectl apply -f -
+
+.PHONY: create-teleport-users
+create-teleport-users:
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl create -f < ./test/teleport/role/member.yaml
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl users add myuser2 --roles=member,editor
+
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl create -f < ./test/teleport/role/api-access.yaml
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl users add api-access2 --roles=api-access
+
