@@ -135,10 +135,6 @@ func (w *LocalSessionWatcher) notify(ctx context.Context, pod corev1.Pod, tracke
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
-
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
 	currentLoggedIn := pod.Annotations[common.AnnotationLoggedIn]
 
 	if status.Total == 0 {

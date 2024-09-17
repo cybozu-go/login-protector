@@ -3,7 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	teleport_client "github.com/gravitational/teleport/api/client"
+	"log"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -42,7 +45,8 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	var ttyCheckInterval time.Duration
+	var sessionCheckInterval time.Duration
+	var sessionWatcher string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -52,7 +56,8 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.DurationVar(&ttyCheckInterval, "tty-check-interval", 5*time.Second, "interval to check TTY")
+	flag.DurationVar(&sessionCheckInterval, "session-check-interval", 5*time.Second, "interval to check session")
+	flag.StringVar(&sessionWatcher, "session-watcher", "local", "session watcher to use (local or teleport)")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -109,17 +114,48 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("creating local session watcher")
+	setupLog.Info("creating session watcher", "type", sessionWatcher)
 	ch := make(chan event.TypedGenericEvent[*corev1.Pod])
-	watcher := controller.NewLocalSessionWatcher(
-		mgr.GetClient(),
-		mgr.GetLogger().WithName("LocalSessionWatcher"),
-		ttyCheckInterval,
-		ch,
-	)
+
+	var watcher manager.Runnable
+	switch sessionWatcher {
+	case "local":
+		watcher = controller.NewLocalSessionWatcher(
+			mgr.GetClient(),
+			mgr.GetLogger().WithName("LocalSessionWatcher"),
+			sessionCheckInterval,
+			ch,
+		)
+	case "teleport":
+		teleportClient, err := teleport_client.New(ctx, teleport_client.Config{
+			Addrs: []string{
+				"localhost:3080",
+				"localhost:3025",
+				"localhost:3024",
+			},
+			Credentials: []teleport_client.Credentials{
+				teleport_client.LoadIdentityFile("api-access.pem"),
+			},
+		})
+
+		if err != nil {
+			log.Fatalf("failed to create client: %v", err)
+		}
+		defer teleportClient.Close()
+		watcher = controller.NewTeleportSessionWatcher(
+			mgr.GetClient(),
+			teleportClient,
+			mgr.GetLogger().WithName("TeleportSessionWatcher"),
+			sessionCheckInterval,
+			ch,
+		)
+	default:
+		setupLog.Error(nil, "unknown session watcher", "type", sessionWatcher)
+		os.Exit(1)
+	}
 	err = mgr.Add(watcher)
 	if err != nil {
-		setupLog.Error(err, "unable to add runnable", "runnable", "LocalSessionWatcher")
+		setupLog.Error(err, "unable to add watcher", "type", sessionWatcher)
 		os.Exit(1)
 	}
 
