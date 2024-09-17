@@ -2,8 +2,8 @@ package common
 
 const LabelKeyLoginProtectorProtect = "login-protector.cybozu.io/protect"
 const AnnotationKeyNoPDB = "login-protector.cybozu.io/no-pdb"
-const AnnotationKeyExporterName = "login-protector.cybozu.io/exporter-name"
-const AnnotationKeyExporterPort = "login-protector.cybozu.io/exporter-port"
+const AnnotationKeyTrackerName = "login-protector.cybozu.io/tracker-name"
+const AnnotationKeyTrackerPort = "login-protector.cybozu.io/tracker-port"
 
 const ValueTrue = "true"
 const KindStatefulSet = "StatefulSet"

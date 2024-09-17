@@ -1,4 +1,4 @@
-package tty_exporter
+package local_session_tracker
 
 import (
 	"math"
@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const metricsNamespace = "tty_exporter"
+const metricsNamespace = "local_session_tracker"
 
 func InitMetrics(logger *zap.Logger) {
 	prometheus.MustRegister(prometheus.NewGaugeFunc(

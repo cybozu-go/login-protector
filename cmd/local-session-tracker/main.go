@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/cybozu-go/login-protector/internal/common"
-	tty_exporter "github.com/cybozu-go/login-protector/internal/tty-exporter"
+	local_session_tracker "github.com/cybozu-go/login-protector/internal/local-session-tracker"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
@@ -28,9 +28,9 @@ func newZapLogger() *zap.Logger {
 func main() {
 	logger := newZapLogger()
 	defer logger.Sync() //nolint:errcheck
-	logger.Info("starting ttypdb-sidecar...")
+	logger.Info("starting local-session-tracker...")
 
-	tty_exporter.InitMetrics(logger)
+	local_session_tracker.InitMetrics(logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -52,7 +52,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/readyz", handleReadyz)
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/status", tty_exporter.NewStatusHandler(logger))
+	mux.Handle("/status", local_session_tracker.NewStatusHandler(logger))
 	server := http.Server{
 		Addr:    fmt.Sprintf(":%d", httpServerPort),
 		Handler: common.NewProxyHTTPHandler(mux, logger),

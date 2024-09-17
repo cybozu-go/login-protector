@@ -42,7 +42,7 @@ curl -fsL https://github.com/cybozu-go/login-protector/releases/latest/download/
 login-protector targets only StatefulSets. The StatefulSet should be configured as follows:
 
 1. Add the label `login-protector.cybozu.io/protect: "true"` to the StatefulSet.
-2. Add the sidecar container `ghcr.io/cybozu-go/tty-exporter` and specify `shareProcessNamespace: true`.
+2. Add the sidecar container `ghcr.io/cybozu-go/local-session-tracker` and specify `shareProcessNamespace: true`.
 3. Set the `updateStrategy` to `type: OnDelete`.
 
 
@@ -71,8 +71,8 @@ spec:
         image: ghcr.io/cybozu/ubuntu:22.04
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
-      - name: tty-exporter
-        image: ghcr.io/cybozu-go/tty-exporter:latest
+      - name: local-session-tracker
+        image: ghcr.io/cybozu-go/local-session-tracker:latest
         imagePullPolicy: IfNotPresent
         ports:
         - name: sidecar
@@ -86,8 +86,8 @@ spec:
 
 Annotations can be used to modify the behavior of login-protector for the target StatefulSet:
 
-- `login-protector.cybozu.io/exporter-name`: Specify the name of the tty-exporter sidecar container. Default is "tty-exporter".
-- `login-protector.cybozu.io/exporter-port`: Specify the port of the tty-exporter sidecar container. Default is "8080".
+- `login-protector.cybozu.io/tracker-name`: Specify the name of the local-session-tracker sidecar container. Default is "local-session-tracker".
+- `login-protector.cybozu.io/tracker-port`: Specify the port of the local-session-tracker sidecar container. Default is "8080".
 - `login-protector.cybozu.io/no-pdb`: Set to "true" to prevent the creation of a PodDisruptionBudget.
 
 
@@ -99,8 +99,8 @@ metadata:
   labels:
     login-protector.cybozu.io/protect: "true"
   annotations:
-    login-protector.cybozu.io/exporter-name: sidecar
-    login-protector.cybozu.io/exporter-port: "9090"
+    login-protector.cybozu.io/tracker-name: sidecar
+    login-protector.cybozu.io/tracker-port: "9090"
     login-protector.cybozu.io/no-pdb: "true"
 spec:
   replicas: 1
@@ -119,7 +119,7 @@ spec:
           imagePullPolicy: IfNotPresent
           command: [ "sleep", "infinity" ]
         - name: sidecar
-          image: ghcr.io/cybozu-go/tty-exporter:latest
+          image: ghcr.io/cybozu-go/local-session-tracker:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: sidecar

@@ -21,8 +21,8 @@ spec:
         image: ghcr.io/cybozu/ubuntu:22.04
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
-      - name: tty-exporter
-        image: ghcr.io/cybozu-go/tty-exporter:0.0.1
+      - name: local-session-tracker
+        image: local-session-tracker:dev
         imagePullPolicy: IfNotPresent
         ports:
         - name: sidecar
@@ -51,8 +51,8 @@ spec:
         image: ghcr.io/cybozu/ubuntu:22.04
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
-      - name: tty-exporter
-        image: ghcr.io/cybozu-go/tty-exporter:0.0.1
+      - name: local-session-tracker
+        image: local-session-tracker:dev
         imagePullPolicy: IfNotPresent
         ports:
         - name: sidecar

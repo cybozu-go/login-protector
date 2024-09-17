@@ -53,13 +53,13 @@ func (r *PDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	exporterName := "tty-exporter"
-	if name, ok := sts.Annotations[common.AnnotationKeyExporterName]; ok {
-		exporterName = name
+	trackerName := "local-session-tracker"
+	if name, ok := sts.Annotations[common.AnnotationKeyTrackerName]; ok {
+		trackerName = name
 	}
-	exporterPort := "8080"
-	if port, ok := sts.Annotations[common.AnnotationKeyExporterPort]; ok {
-		exporterPort = port
+	trackerPort := "8080"
+	if port, ok := sts.Annotations[common.AnnotationKeyTrackerPort]; ok {
+		trackerPort = port
 	}
 	noPDB := false
 	if noPDBStr, ok := sts.Annotations[common.AnnotationKeyNoPDB]; ok {
@@ -68,7 +68,7 @@ func (r *PDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	errorList := make([]error, 0)
 	for _, pod := range podList.Items {
-		err = r.reconcilePDB(ctx, &pod, exporterName, exporterPort, noPDB)
+		err = r.reconcilePDB(ctx, &pod, trackerName, trackerPort, noPDB)
 		if err != nil {
 			errorList = append(errorList, err)
 		}
@@ -81,7 +81,7 @@ func (r *PDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, exporterName string, exporterPort string, noPDB bool) error {
+func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, trackerName string, trackerPort string, noPDB bool) error {
 	logger := log.FromContext(ctx)
 
 	if pod.DeletionTimestamp != nil {
@@ -114,17 +114,17 @@ func (r *PDBReconciler) reconcilePDB(ctx context.Context, pod *corev1.Pod, expor
 	var container *corev1.Container
 	for _, c := range pod.Spec.Containers {
 		c := c
-		if c.Name == exporterName {
+		if c.Name == trackerName {
 			container = &c
 			break
 		}
 	}
 	if container == nil {
-		err := fmt.Errorf("failed to find sidecar container (Name: %s)", exporterName)
+		err := fmt.Errorf("failed to find sidecar container (Name: %s)", trackerName)
 		return err
 	}
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s/status", podIP, exporterPort))
+	resp, err := http.Get(fmt.Sprintf("http://%s:%s/status", podIP, trackerPort))
 	if err != nil {
 		return err
 	}

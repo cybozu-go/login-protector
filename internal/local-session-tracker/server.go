@@ -1,4 +1,4 @@
-package tty_exporter
+package local_session_tracker
 
 import (
 	"encoding/json"

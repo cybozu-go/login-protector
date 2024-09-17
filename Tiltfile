@@ -6,10 +6,10 @@ COPY ./bin/login-protector /
 CMD ["/login-protector"]
 '''
 
-EXPORTER_DOCKERFILE = '''FROM golang:alpine
+TRACKER_DOCKERFILE = '''FROM golang:alpine
 WORKDIR /
-COPY ./bin/tty-exporter /
-CMD ["/tty-exporter"]
+COPY ./bin/local-session-tracker /
+CMD ["/local-session-tracker"]
 '''
 
 # Generate manifests
@@ -39,11 +39,11 @@ docker_build_with_restart(
 k8s_yaml("./test/testdata/statefulset.yaml")
 
 docker_build_with_restart(
-    'tty-exporter:dev', '.',
-    dockerfile_contents=EXPORTER_DOCKERFILE,
-    entrypoint=['/tty-exporter', '--zap-devel=true'],
-    only=['./bin/tty-exporter'],
+    'local-session-tracker:dev', '.',
+    dockerfile_contents=TRACKER_DOCKERFILE,
+    entrypoint=['/local-session-tracker', '--zap-devel=true'],
+    only=['./bin/local-session-tracker'],
     live_update=[
-        sync('./bin/tty-exporter', '/tty-exporter'),
+        sync('./bin/local-session-tracker', '/local-session-tracker'),
     ]
 )
