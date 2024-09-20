@@ -63,6 +63,7 @@ test-e2e: start-kind load-image deploy
 
 .PHONY: test-teleport  # Run the e2e tests with Teleport.
 test-teleport: start-kind-teleport load-image deploy-teleport
+	go test ./test/teleport/ -v -ginkgo.v
 
 .PHONY: lint
 lint: setup ## Run golangci-lint linter & yamllint
@@ -198,6 +199,5 @@ deploy-teleport:
 	kustomize build ./config/teleport | kubectl apply -f -
 	kubectl -n login-protector-system wait --for=condition=available --timeout=180s --all deployments
 
-login:
 	kubectl get secret -n login-protector-system identity-output  -o json | jq -r .data.identity | base64 -d > identity
-	./teleport/tsh -i ./identity --proxy --insecure localhost:3080 ssh cybozu@node-demo-0
+
