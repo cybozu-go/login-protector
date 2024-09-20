@@ -3,10 +3,8 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	teleport_client "github.com/gravitational/teleport/api/client"
 	"log"
 	"os"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"strings"
 	"time"
 
@@ -15,6 +13,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/cybozu-go/login-protector/internal/controller"
+	teleport_client "github.com/gravitational/teleport/api/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -24,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
@@ -48,7 +48,7 @@ func main() {
 	var enableHTTP2 bool
 	var sessionCheckInterval time.Duration
 	var sessionWatcher string
-	var teleportApiToken string
+	var teleportIdentityFile string
 	var teleportNamespace string
 	var teleportAddrs string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -62,9 +62,9 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.DurationVar(&sessionCheckInterval, "session-check-interval", 5*time.Second, "interval to check session")
 	flag.StringVar(&sessionWatcher, "session-watcher", "local", "session watcher to use (local or teleport)")
-	flag.StringVar(&teleportApiToken, "teleport-api-token", "", "The file path of Teleport API token")
+	flag.StringVar(&teleportIdentityFile, "teleport-identity-file", "", "The file path of Teleport Identity")
 	flag.StringVar(&teleportNamespace, "teleport-namespace", "teleport", "The namespace of Teleport")
-	flag.StringVar(&teleportAddrs, "teleport-addrs", "teleport:3080,teleport-auth:3025,teleport:3024", "The comma-separated list of Teleport addresses")
+	flag.StringVar(&teleportAddrs, "teleport-addrs", "teleport-auth:3025", "The comma-separated list of Teleport addresses")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -134,8 +134,8 @@ func main() {
 			ch,
 		)
 	case "teleport":
-		if teleportApiToken == "" {
-			setupLog.Error(nil, "teleport-api-token is required for teleport session watcher")
+		if teleportIdentityFile == "" {
+			setupLog.Error(nil, "teleport-identity-file is required for teleport session watcher")
 			os.Exit(1)
 		}
 		if teleportNamespace == "" {
@@ -149,14 +149,14 @@ func main() {
 		teleportClient, err := teleport_client.New(ctx, teleport_client.Config{
 			Addrs: strings.Split(teleportAddrs, ","),
 			Credentials: []teleport_client.Credentials{
-				teleport_client.LoadIdentityFile(teleportApiToken),
+				teleport_client.LoadIdentityFile(teleportIdentityFile),
 			},
 		})
 
 		if err != nil {
 			log.Fatalf("failed to create client: %v", err)
 		}
-		defer teleportClient.Close()
+		defer teleportClient.Close() // nolint: errcheck
 		watcher = controller.NewTeleportSessionWatcher(
 			mgr.GetClient(),
 			teleportClient,

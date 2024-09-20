@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tbot
+  namespace: login-protector-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tbot
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tbot
+    spec:
+      containers:
+        - name: tbot
+          image: public.ecr.aws/gravitational/tbot-distroless:15.3.7
+          args:
+            - start
+            - -c
+            - /config/tbot.yaml
+            - --insecure
+            - --debug
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KUBERNETES_TOKEN_PATH
+              value: /var/run/secrets/tokens/join-sa-token
+            - name: TELEPORT_ANONYMOUS_TELEMETRY
+              value: "1"
+          volumeMounts:
+            - mountPath: /config
+              name: config
+            - mountPath: /var/run/secrets/tokens
+              name: join-sa-token
+      serviceAccountName: tbot
+      volumes:
+        - name: config
+          configMap:
+            name: tbot-config
+        - name: join-sa-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: join-sa-token
+                  expirationSeconds: 600
+                  audience: teleport-demo

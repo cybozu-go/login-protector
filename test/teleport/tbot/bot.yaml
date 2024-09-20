@@ -1,0 +1,8 @@
+kind: bot
+version: v1
+metadata:
+  name: login-protector-bot
+spec:
+  roles:
+    - api-access
+    - member

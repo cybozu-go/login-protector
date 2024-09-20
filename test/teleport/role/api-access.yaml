@@ -10,6 +10,4 @@ spec:
           - list
           - read
   deny: {}
-  options:
-    max_session_ttl: 87600h0m0s
 version: v7

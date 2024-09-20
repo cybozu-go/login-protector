@@ -56,6 +56,15 @@ make load-image
 $ kustomize build ./config/teleport | kubectl apply -f -
 ```
 
+
+## Create Bot
+
+
+
+```console
+
+```
+
 ## Teleport Version
 
 Teleport rejects connections from clients running incompatible versions.

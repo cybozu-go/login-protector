@@ -116,6 +116,7 @@ data:
       mysql_listen_addr: 0.0.0.0:3036
       public_addr:
       - localhost:3080
+      - teleport.teleport.svc.cluster.local:443
       tunnel_listen_addr: 0.0.0.0:3024
     ssh_service:
       enabled: false
@@ -488,7 +489,7 @@ spec:
     metadata:
       annotations:
         # ConfigMap checksum, to recreate the pod on config changes.
-        checksum/config: 679ed789012e348f3db624985790218307d4924c71aa0fb7091724de18afea4f
+        checksum/config: 59a655bea21e5dc97e318b7a4469b63f854d3bb82061c2cc2d60ba229fb3a698
       labels:
         app.kubernetes.io/name: 'teleport-cluster'
         app.kubernetes.io/instance: 'teleport'

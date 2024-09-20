@@ -12,14 +12,14 @@ spec:
           args:
             - --leader-elect
             - --session-watcher=teleport
-            - --teleport-api-token=/etc/login-protector/api-access.pem
+            - --teleport-identity-file=/etc/login-protector/identity
             - --teleport-namespace=teleport
             - --teleport-addrs=teleport-auth.teleport.svc.cluster.local:3025
           name: manager
           volumeMounts:
             - mountPath: /etc/login-protector
-              name: api-token
+              name: identity
       volumes:
-        - name: api-token
+        - name: identity
           secret:
-            secretName: teleport-api-token
+            secretName: identity-output

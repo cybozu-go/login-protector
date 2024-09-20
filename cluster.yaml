@@ -9,18 +9,3 @@ name: kind-login-protector-dev
 product: kind
 kubernetesVersion: v1.30.0
 registry: ctlptl-registry
-kindV1Alpha4Cluster:
-  nodes:
-  - role: control-plane
-  - role: worker
-    extraPortMappings:
-    - containerPort: 30080
-      hostPort: 3080
-    - containerPort: 30023
-      hostPort: 3023
-    - containerPort: 30024
-      hostPort: 3024
-    - containerPort: 30026
-      hostPort: 3026
-    - containerPort: 31025
-      hostPort: 3025

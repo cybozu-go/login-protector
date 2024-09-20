@@ -4,3 +4,4 @@ persistence:
   enabled: false
 publicAddr:
   - localhost:3080
+  - teleport.teleport.svc.cluster.local:443
