@@ -69,6 +69,7 @@ rules:
   verbs:
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - ""
@@ -162,7 +163,7 @@ spec:
         - --leader-elect
         command:
         - /login-protector
-        image: ghcr.io/cybozu-go/login-protector:0.0.1
+        image: ghcr.io/cybozu-go/login-protector:0.1.0
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
