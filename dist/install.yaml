@@ -156,6 +156,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
+        app.kubernetes.io/name: login-protector
         control-plane: controller-manager
     spec:
       containers:
@@ -163,7 +164,7 @@ spec:
         - --leader-elect
         command:
         - /login-protector
-        image: ghcr.io/cybozu-go/login-protector:0.1.0
+        image: ghcr.io/cybozu-go/login-protector:0.1.1
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -172,6 +173,13 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
+        ports:
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
