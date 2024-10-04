@@ -26,6 +26,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
+        app.kubernetes.io/name: login-protector
         control-plane: controller-manager
     spec:
       securityContext:
@@ -59,5 +60,12 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
+        ports:
+          - containerPort: 8081
+            name: health
+            protocol: TCP
+          - containerPort: 8080
+            name: metrics
+            protocol: TCP
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
