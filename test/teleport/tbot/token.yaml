@@ -1,0 +1,14 @@
+kind: token
+version: v2
+metadata:
+  name: login-protector-bot-token
+spec:
+  roles: [Bot]
+  bot_name: login-protector-bot
+  join_method: kubernetes
+  kubernetes:
+    type: static_jwks
+    static_jwks:
+      jwks: '<Generated JWKS>'
+    allow:
+    - service_account: "login-protector-system:tbot" # service_account

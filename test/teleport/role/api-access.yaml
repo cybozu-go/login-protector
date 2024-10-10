@@ -1,0 +1,13 @@
+kind: role
+metadata:
+  name: api-access
+spec:
+  allow:
+    rules:
+      - resources:
+          - session_tracker
+        verbs:
+          - list
+          - read
+  deny: {}
+version: v7

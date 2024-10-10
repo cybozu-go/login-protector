@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tbot-config
+  namespace: login-protector-system
+data:
+  tbot.yaml: |
+    version: v2
+    debug: true
+    onboarding:
+      join_method: kubernetes
+      token: login-protector-bot-token
+    storage:
+      type: memory
+    auth_server: teleport-auth.teleport.svc.cluster.local:3025
+    outputs:
+      - type: identity
+        destination:
+          type: kubernetes_secret
+          name: identity-output

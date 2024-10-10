@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - command:
+            - /login-protector
+          args:
+            - --leader-elect
+            - --session-watcher=teleport
+            - --teleport-identity-file=/etc/login-protector/identity
+            - --teleport-namespace=teleport
+            - --teleport-addrs=teleport-auth.teleport.svc.cluster.local:3025
+          name: manager
+          volumeMounts:
+            - mountPath: /etc/login-protector
+              name: identity
+      volumes:
+        - name: identity
+          secret:
+            secretName: identity-output

@@ -2,6 +2,8 @@
 PROTECTOR_IMG ?= login-protector:dev
 TRACKER_IMG ?= local-session-tracker:dev
 
+TELEPORT_VERSION ?= 15.3.7
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -59,6 +61,10 @@ vet: ## Run go vet against code.
 test-e2e: start-kind load-image deploy
 	go test ./test/e2e/ -v -ginkgo.v
 
+.PHONY: test-teleport  # Run the e2e tests with Teleport.
+test-teleport: start-kind-teleport load-image deploy-teleport
+	go test ./test/teleport/ -v -ginkgo.v
+
 .PHONY: lint
 lint: setup ## Run golangci-lint linter & yamllint
 	golangci-lint run
@@ -112,6 +118,10 @@ endif
 start-kind: setup
 	kind create cluster
 
+.PHONY: start-kind-teleport
+start-kind-teleport: setup
+	kind create cluster --config=./test/teleport/kind-config.yaml
+
 .PHONY: stop-kind
 stop-kind: setup
 	kind delete cluster
@@ -136,5 +146,58 @@ undeploy: setup ## Undeploy controller from the K8s cluster specified in ~/.kube
 
 ##@ Setup
 
+.PHONY: setup
 setup:
 	aqua install -l
+
+##@ Teleport
+
+.PHONY: update-teleport-manifests
+update-teleport-manifests:
+	helm repo add teleport https://charts.releases.teleport.dev
+	helm repo update
+	helm template teleport --namespace teleport teleport/teleport-cluster \
+		--create-namespace \
+		--version $(TELEPORT_VERSION) \
+		--values ./test/teleport/cluster/values.yaml \
+		> ./test/teleport/cluster/teleport-cluster.yaml
+
+.PHONY: setup-teleport-cli
+setup-teleport-cli:
+	rm -rf teleport
+	wget https://cdn.teleport.dev/teleport-v$(TELEPORT_VERSION)-linux-amd64-bin.tar.gz
+	tar -xvf teleport-v$(TELEPORT_VERSION)-linux-amd64-bin.tar.gz
+	rm teleport-v$(TELEPORT_VERSION)-linux-amd64-bin.tar.gz
+
+.PHONY: deploy-teleport
+deploy-teleport:
+	# Setup Teleport Cluster
+	kubectl create namespace teleport
+	kustomize build ./test/teleport/cluster | kubectl apply -f -
+	kubectl -n teleport wait --for=condition=available --timeout=180s --all deployments
+
+	# Setup Teleport Node
+	TOKEN=$$(kubectl exec -it -n teleport deployment/teleport-auth -- tctl tokens add --type=node --format json | jq -r ".token") && \
+		sed -i "s/auth_token: .*/auth_token: $$TOKEN/g" ./test/teleport/node/teleport-secret.yaml
+	kustomize build ./test/teleport/node | kubectl apply -f -
+
+	# Deploy tbot
+	kubectl create namespace login-protector-system
+	kubectl apply -f ./test/teleport/tbot/rbac.yaml
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl create -f < ./test/teleport/role/member.yaml
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl create -f < ./test/teleport/role/api-access.yaml
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl create -f < ./test/teleport/tbot/bot.yaml
+	kubectl proxy -p 8080 &
+	sleep 3 # Wait for kubectl proxy to start
+	JWKS=$$(curl http://localhost:8080/openid/v1/jwks) && \
+		sed -i "s/      jwks: .*/      jwks: \'$$JWKS\'/g" ./test/teleport/tbot/token.yaml
+	kubectl exec -i -n teleport deployment/teleport-auth -- tctl create -f < ./test/teleport/tbot/token.yaml
+	kubectl apply -f ./test/teleport/tbot/configmap.yaml
+	kubectl apply -f ./test/teleport/tbot/deployment.yaml
+
+	# Deploy Login Protector with teleport-session-watcher
+	kustomize build ./config/teleport | kubectl apply -f -
+	kubectl -n login-protector-system wait --for=condition=available --timeout=180s --all deployments
+
+	kubectl get secret -n login-protector-system identity-output  -o json | jq -r .data.identity | base64 -d > identity
+

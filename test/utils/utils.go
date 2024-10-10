@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -57,7 +58,8 @@ func GetProjectDir() (string, error) {
 	if err != nil {
 		return wd, err
 	}
-	wd = strings.Replace(wd, "/test/e2e", "", -1)
+	re := regexp.MustCompile("/test/.*")
+	wd = re.ReplaceAllString(wd, "")
 	return wd, nil
 }
 

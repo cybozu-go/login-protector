@@ -6,7 +6,7 @@ on:
     - 'main'
 jobs:
   test:
-    name: Tests
+    name: E2E Test
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
@@ -18,3 +18,16 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
     - run: make lint
     - run: make test-e2e
+  test-teleport:
+    name: E2E Test with Teleport
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/aqua
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: make setup-teleport-cli
+      - run: make test-teleport

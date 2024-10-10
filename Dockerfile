@@ -24,7 +24,7 @@ USER 10000:10000
 ENTRYPOINT ["/local-session-tracker"]
 
 # Build the login-protector binary
-FROM scratch AS login-protector
+FROM ghcr.io/cybozu/ubuntu-debug:22.04 AS login-protector
 LABEL org.opencontainers.image.source="https://github.com/cybozu-go/login-protector"
 
 COPY --from=build /go/bin/login-protector .
