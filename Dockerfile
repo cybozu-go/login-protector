@@ -1,5 +1,5 @@
 # Build the controller binary
-FROM ghcr.io/cybozu/golang:1.22-jammy AS build
+FROM ghcr.io/cybozu/golang:1.23-jammy AS build
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
