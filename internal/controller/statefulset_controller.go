@@ -107,7 +107,6 @@ func (u *StatefulSetUpdater) evictPod(ctx context.Context, sts *appsv1.StatefulS
 	// Evict one of the outdated pods
 	var pod *corev1.Pod
 	for _, p := range outdatedPods {
-		p := p
 		if p.Status.Phase != corev1.PodRunning {
 			logger.Info("not running pod found", "pod", p.Name, "namespace", p.Namespace)
 			pod = &p
