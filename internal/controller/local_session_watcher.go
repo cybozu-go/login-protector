@@ -101,7 +101,6 @@ func (w *LocalSessionWatcher) notify(ctx context.Context, pod corev1.Pod, tracke
 
 	var container *corev1.Container
 	for _, c := range pod.Spec.Containers {
-		c := c
 		if c.Name == trackerName {
 			container = &c
 			break

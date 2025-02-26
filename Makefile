@@ -20,6 +20,11 @@ CONTAINER_TOOL ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# Specify k8s version of kind cluster for test.
+# You can find the version and SHA256 at https://github.com/kubernetes-sigs/kind/releases.
+KINDTEST_K8S_VERSION := 1.31.6
+KINDEST_NODE_SHA256 := 28b7cbb993dfe093c76641a0c95807637213c9109b761f1d422c2400e22b8e87
+
 .PHONY: all
 all: build
 
@@ -110,7 +115,7 @@ endif
 
 .PHONY: start-kind
 start-kind: setup
-	kind create cluster
+	kind create cluster --image kindest/node:v$(KINDTEST_K8S_VERSION)@sha256:$(KINDEST_NODE_SHA256)
 
 .PHONY: stop-kind
 stop-kind: setup

@@ -84,7 +84,7 @@ func selectTargetPDBPredicate(ctx context.Context, cli client.Client) predicate.
 	})
 }
 
-func requestFromPDBFunc(cli client.Client) handler.TypedMapFunc[*policyv1.PodDisruptionBudget] {
+func requestFromPDBFunc(cli client.Client) handler.TypedMapFunc[*policyv1.PodDisruptionBudget, reconcile.Request] {
 	return func(ctx context.Context, pdb *policyv1.PodDisruptionBudget) []reconcile.Request {
 		ownerPod := metav1.GetControllerOf(pdb)
 		if ownerPod == nil {
