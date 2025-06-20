@@ -9,6 +9,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/util/workqueue"
 
 	"github.com/cybozu-go/login-protector/internal/controller"
 	corev1 "k8s.io/api/core/v1"
@@ -101,9 +102,10 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 	setupLog.Info("creating statefulset controller")
 	if err = (&controller.StatefulSetUpdater{
-		Client:    mgr.GetClient(),
-		ClientSet: kubernetes.NewForConfigOrDie(mgr.GetConfig()),
-		Scheme:    mgr.GetScheme(),
+		Client:             mgr.GetClient(),
+		ClientSet:          kubernetes.NewForConfigOrDie(mgr.GetConfig()),
+		Scheme:             mgr.GetScheme(),
+		RequeueRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[ctrl.Request](1*time.Second, 1000*time.Second),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
