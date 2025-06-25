@@ -238,7 +238,8 @@ var _ = Describe("controller", Ordered, func() {
 
 			// login to target-sts-0 Pod using `kubectl exec`
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 3*testIntervalSeconds+2))
+				// subsequent tests may take some time, so sleep longer duration
+				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", "180")
 				if err != nil {
 					panic(err)
 				}
