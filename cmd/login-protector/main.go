@@ -105,7 +105,7 @@ func main() {
 		Client:             mgr.GetClient(),
 		ClientSet:          kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Scheme:             mgr.GetScheme(),
-		RequeueRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[ctrl.Request](1*time.Second, 1000*time.Second),
+		RequeueRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[ctrl.Request](1*time.Second, 300*time.Second),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
