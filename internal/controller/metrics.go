@@ -54,7 +54,7 @@ func (c *metricsCollector) Collect(ch chan<- prometheus.Metric) {
 	ctx := context.Background()
 
 	var stsList appsv1.StatefulSetList
-	err := c.Client.List(ctx, &stsList, &client.ListOptions{
+	err := c.List(ctx, &stsList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{common.LabelKeyLoginProtectorProtect: common.ValueTrue}),
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func (c *metricsCollector) Collect(ch chan<- prometheus.Metric) {
 
 	for _, sts := range stsList.Items {
 		pods := &corev1.PodList{}
-		if err := c.Client.List(ctx, pods, client.InNamespace(sts.Namespace), client.MatchingLabels(sts.Spec.Selector.MatchLabels)); err != nil {
+		if err := c.List(ctx, pods, client.InNamespace(sts.Namespace), client.MatchingLabels(sts.Spec.Selector.MatchLabels)); err != nil {
 			c.logger.Error(err, "Unable to list Pods for collecting metrics")
 			continue
 		}
@@ -82,7 +82,7 @@ func (c *metricsCollector) Collect(ch chan<- prometheus.Metric) {
 			)
 
 			pdb := &policyv1.PodDisruptionBudget{}
-			err = c.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, pdb)
+			err = c.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, pdb)
 			if err != nil && !k8serrors.IsNotFound(err) {
 				c.logger.Error(err, "Unable to get PodDisruptionBudget for collecting metrics")
 				continue

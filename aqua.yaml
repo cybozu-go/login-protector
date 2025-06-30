@@ -8,12 +8,12 @@
 #   - all
 registries:
 - type: standard
-  ref: v4.318.1 # renovate: depName=aquaproj/aqua-registry
+  ref: v4.379.0 # renovate: depName=aquaproj/aqua-registry
 packages:
 - name: kubernetes-sigs/kustomize@kustomize/v5.6.0
-- name: kubernetes-sigs/kind@v0.27.0
-- name: kubernetes/kubectl@v1.31.6
-- name: kubernetes-sigs/controller-tools/controller-gen@envtest-v1.31.0
-- name: golangci/golangci-lint@v1.64.5
-- name: tilt-dev/ctlptl@v0.8.39
-- name: tilt-dev/tilt@v0.33.22
+- name: kubernetes-sigs/kind@v0.29.0
+- name: kubernetes/kubectl@v1.33.2
+- name: kubernetes-sigs/controller-tools/controller-gen@envtest-v1.33.0
+- name: golangci/golangci-lint@v2.1.6
+- name: tilt-dev/ctlptl@v0.8.42
+- name: tilt-dev/tilt@v0.35.0

@@ -237,8 +237,9 @@ var _ = Describe("controller", Ordered, func() {
 			}).Should(Succeed())
 
 			// login to target-sts-0 Pod using `kubectl exec`
+			intervalToWaitForImagePull := 3 * time.Minute
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 3*testIntervalSeconds+2))
+				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%.0f", intervalToWaitForImagePull.Seconds()))
 				if err != nil {
 					panic(err)
 				}
@@ -266,7 +267,7 @@ var _ = Describe("controller", Ordered, func() {
 				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-0"}).GetGauge().GetValue()).Should(BeEquivalentTo(1))
 				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-1"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
 				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{"watcher": "local-session-watcher"})).ShouldNot(BeNil())
-			}).WithTimeout(3 * time.Minute).Should(Succeed())
+			}).WithTimeout(intervalToWaitForImagePull).Should(Succeed())
 		})
 	})
 })

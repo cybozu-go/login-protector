@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,9 +22,10 @@ import (
 
 // StatefulSetUpdater reconciles a StatefulSet object
 type StatefulSetUpdater struct {
-	Client    client.Client
-	ClientSet kubernetes.Interface
-	Scheme    *runtime.Scheme
+	Client             client.Client
+	ClientSet          kubernetes.Interface
+	Scheme             *runtime.Scheme
+	RequeueRateLimiter workqueue.TypedRateLimiter[ctrl.Request]
 }
 
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch
@@ -33,6 +35,13 @@ type StatefulSetUpdater struct {
 
 func (u *StatefulSetUpdater) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+
+	requeue := false
+	defer func() {
+		if !requeue {
+			u.RequeueRateLimiter.Forget(req)
+		}
+	}()
 
 	sts := &appsv1.StatefulSet{}
 	if err := u.Client.Get(ctx, req.NamespacedName, sts); err != nil {
@@ -60,7 +69,9 @@ func (u *StatefulSetUpdater) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 	if requeue {
-		return ctrl.Result{Requeue: true}, nil
+		// requeue using exponential backoff
+		after := u.RequeueRateLimiter.When(req)
+		return ctrl.Result{RequeueAfter: after}, nil
 	}
 
 	// When all pods are up-to-date, update the currentRevision of the StatefulSet
