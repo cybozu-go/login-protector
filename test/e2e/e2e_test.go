@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -178,7 +179,7 @@ var _ = Describe("controller", Ordered, func() {
 			ExpectWithOffset(1, err).ShouldNot(HaveOccurred())
 			defer resp.Body.Close()
 			ExpectWithOffset(1, resp.StatusCode).Should(Equal(http.StatusOK))
-			parser := expfmt.TextParser{}
+			parser := expfmt.NewTextParser(model.UTF8Validation)
 			mfmap, err := parser.TextToMetricFamilies(resp.Body)
 			ExpectWithOffset(1, err).ShouldNot(HaveOccurred())
 			return mfmap

@@ -22,8 +22,8 @@ SHELL = /usr/bin/env bash -o pipefail
 
 # Specify k8s version of kind cluster for test.
 # You can find the version and SHA256 at https://github.com/kubernetes-sigs/kind/releases.
-KINDTEST_K8S_VERSION := 1.33.1
-KINDEST_NODE_SHA256 := 050072256b9a903bd914c0b2866828150cb229cea0efe5892e2b644d5dd3b34f
+KINDTEST_K8S_VERSION := 1.33.4
+KINDEST_NODE_SHA256 := 25a6018e48dfcaee478f4a59af81157a437f15e6e140bf103f85a2e7cd0cbbf2
 
 .PHONY: all
 all: build
