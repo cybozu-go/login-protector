@@ -7,5 +7,5 @@ apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 name: kind-login-protector-dev
 product: kind
-kubernetesVersion: v1.33.4
+kubernetesVersion: v1.34.3
 registry: ctlptl-registry
