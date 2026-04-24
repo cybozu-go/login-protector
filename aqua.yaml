@@ -9,6 +9,12 @@
 registries:
 - type: standard
   ref: v4.496.0
+checksum:
+  enabled: true
+  require_checksum: true
+  supported_envs:
+    - darwin
+    - linux
 packages:
 - name: kubernetes-sigs/kustomize@kustomize/v5.8.1
 - name: kubernetes-sigs/kind@v0.31.0
