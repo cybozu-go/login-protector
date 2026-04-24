@@ -10,4 +10,9 @@ runs:
     - uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c  # v4.0.4
       with:
         aqua_version: v2.57.1
+        # Disable the only-link flag so aqua downloads the tools and verifies their checksums
+        aqua_opts: ""
         github_token: ${{ inputs.github_token }}
+      env:
+        # Verify module checksums during go install
+        GOSUMDB: sum.golang.org
