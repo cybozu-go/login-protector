@@ -13,6 +13,3 @@ runs:
         # Disable the only-link flag so aqua downloads the tools and verifies their checksums
         aqua_opts: ""
         github_token: ${{ inputs.github_token }}
-      env:
-        # Verify module checksums during go install
-        GOSUMDB: sum.golang.org
