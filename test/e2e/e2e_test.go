@@ -19,7 +19,16 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 )
 
-const namespace = "login-protector-system"
+const (
+	namespace           = "login-protector-system"
+	defaultNamespace    = "default"
+	targetSts0Pod       = "target-sts-0"
+	targetSts1Pod       = "target-sts-1"
+	localSessionWatcher = "local-session-watcher"
+	labelNamespace      = "namespace"
+	labelWatcher        = "watcher"
+	labelPod            = "pod"
+)
 
 var _ = Describe("controller", Ordered, func() {
 	Context("Operator", func() {
@@ -76,7 +85,7 @@ var _ = Describe("controller", Ordered, func() {
 
 			// login to target-sts-0 Pod using `kubectl exec`
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
+				_, err := utils.Kubectl(ptmx, "exec", targetSts0Pod, "-it", "--", "sleep", fmt.Sprintf("%d", testIntervalSeconds))
 				if err != nil {
 					panic(err)
 				}
@@ -87,8 +96,8 @@ var _ = Describe("controller", Ordered, func() {
 				err = utils.GetResource("", "", pdbList, "--ignore-not-found")
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
-				g.Expect(pdbList.Items[0].Name).Should(Equal("target-sts-0"))
-				g.Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal("target-sts-0"))
+				g.Expect(pdbList.Items[0].Name).Should(Equal(targetSts0Pod))
+				g.Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal(targetSts0Pod))
 			}).WithTimeout(testInterval).Should(Succeed())
 
 			Eventually(func(g Gomega) {
@@ -123,7 +132,7 @@ var _ = Describe("controller", Ordered, func() {
 
 			// login to target-sts-0 Pod using `kubectl exec`
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%d", 2*testIntervalSeconds+2))
+				_, err := utils.Kubectl(ptmx, "exec", targetSts0Pod, "-it", "--", "sleep", fmt.Sprintf("%d", 2*testIntervalSeconds+2))
 				if err != nil {
 					panic(err)
 				}
@@ -144,7 +153,7 @@ var _ = Describe("controller", Ordered, func() {
 			// make sure the container image is not updated
 			Consistently(func(g Gomega) {
 				pod := &corev1.Pod{}
-				err := utils.GetResource("", "target-sts-0", pod)
+				err := utils.GetResource("", targetSts0Pod, pod)
 				g.Expect(err).NotTo(HaveOccurred())
 				for _, c := range pod.Spec.Containers {
 					if c.Name == "main" {
@@ -164,7 +173,7 @@ var _ = Describe("controller", Ordered, func() {
 			// make sure the container image is updated
 			Eventually(func(g Gomega) {
 				pod := &corev1.Pod{}
-				err := utils.GetResource("", "target-sts-0", pod)
+				err := utils.GetResource("", targetSts0Pod, pod)
 				g.Expect(err).NotTo(HaveOccurred())
 				for _, c := range pod.Spec.Containers {
 					if c.Name == "main" {
@@ -218,11 +227,11 @@ var _ = Describe("controller", Ordered, func() {
 			Eventually(func(g Gomega) {
 				// make sure all metrics are "0"
 				metrics := getMetrics("http://localhost:8080/metrics")
-				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{"namespace": "default", "pod": "target-sts-0"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{"namespace": "default", "pod": "target-sts-1"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-0"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-1"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{"watcher": "local-session-watcher"})).ShouldNot(BeNil())
+				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts0Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts1Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts0Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts1Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{labelWatcher: localSessionWatcher})).ShouldNot(BeNil())
 			}).WithTimeout(testInterval).Should(Succeed())
 
 			ptmx, err := pty.Start(exec.Command("bash"))
@@ -232,7 +241,7 @@ var _ = Describe("controller", Ordered, func() {
 			// Wait for target-sts-0 Pod to be running
 			Eventually(func(g Gomega) {
 				var pod corev1.Pod
-				err := utils.GetResource("", "target-sts-0", &pod)
+				err := utils.GetResource("", targetSts0Pod, &pod)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(pod.Status.Phase).Should(Equal(corev1.PodRunning))
 			}).Should(Succeed())
@@ -240,7 +249,7 @@ var _ = Describe("controller", Ordered, func() {
 			// login to target-sts-0 Pod using `kubectl exec`
 			intervalToWaitForImagePull := 3 * time.Minute
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", "target-sts-0", "-it", "--", "sleep", fmt.Sprintf("%.0f", intervalToWaitForImagePull.Seconds()))
+				_, err := utils.Kubectl(ptmx, "exec", targetSts0Pod, "-it", "--", "sleep", fmt.Sprintf("%.0f", intervalToWaitForImagePull.Seconds()))
 				if err != nil {
 					panic(err)
 				}
@@ -249,11 +258,11 @@ var _ = Describe("controller", Ordered, func() {
 			Eventually(func(g Gomega) {
 				// make sure protecting metrics for target-sts-0 is "1"
 				metrics := getMetrics("http://localhost:8080/metrics")
-				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{"namespace": "default", "pod": "target-sts-0"}).GetGauge().GetValue()).Should(BeEquivalentTo(1))
-				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{"namespace": "default", "pod": "target-sts-1"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-0"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-1"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{"watcher": "local-session-watcher"})).ShouldNot(BeNil())
+				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts0Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(1))
+				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts1Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts0Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts1Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{labelWatcher: localSessionWatcher})).ShouldNot(BeNil())
 			}).WithTimeout(testInterval).Should(Succeed())
 
 			// update container image of target-sts
@@ -263,11 +272,11 @@ var _ = Describe("controller", Ordered, func() {
 			Eventually(func(g Gomega) {
 				// make sure pending metrics for target-sts-0 is "1"
 				metrics := getMetrics("http://localhost:8080/metrics")
-				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{"namespace": "default", "pod": "target-sts-0"}).GetGauge().GetValue()).Should(BeEquivalentTo(1))
-				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{"namespace": "default", "pod": "target-sts-1"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-0"}).GetGauge().GetValue()).Should(BeEquivalentTo(1))
-				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{"namespace": "default", "pod": "target-sts-1"}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
-				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{"watcher": "local-session-watcher"})).ShouldNot(BeNil())
+				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts0Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(1))
+				g.Expect(findMetric(metrics, "login_protector_pod_protecting", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts1Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts0Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(1))
+				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts1Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
+				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{labelWatcher: localSessionWatcher})).ShouldNot(BeNil())
 			}).WithTimeout(intervalToWaitForImagePull).Should(Succeed())
 		})
 	})

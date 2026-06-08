@@ -241,6 +241,14 @@ exit
 
 The container image of the test Pod should be updated because it is no longer logged in.
 
+### Update pinned GitHub Actions
+
+This repository uses [pinact](https://github.com/suzuki-shunsuke/pinact) to update and verify pinned GitHub Actions.
+
+```shell
+$ GITHUB_TOKEN="$(gh auth token)" pinact run --update --min-age 14
+```
+
 ## License
 
 Apache License 2.0
