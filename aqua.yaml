@@ -8,7 +8,7 @@
 #   - all
 registries:
 - type: standard
-  ref: v4.496.0
+  ref: v4.558.1
 checksum:
   enabled: true
   require_checksum: true
@@ -20,7 +20,7 @@ packages:
 - name: kubernetes-sigs/kind@v0.31.0
 - name: kubernetes/kubectl@v1.35.4
 - name: kubernetes-sigs/controller-tools/controller-gen@v0.20.1
-- name: golangci/golangci-lint@v2.12.2
-- name: suzuki-shunsuke/pinact@v4.0.0
-- name: tilt-dev/ctlptl@v0.9.4
-- name: tilt-dev/tilt@v0.37.3
+- name: golangci/golangci-lint@v2.13.2
+- name: suzuki-shunsuke/pinact@v4.1.1
+- name: tilt-dev/ctlptl@v0.9.5
+- name: tilt-dev/tilt@v0.37.7

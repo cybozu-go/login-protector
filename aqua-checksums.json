@@ -41,6 +41,26 @@
       "algorithm": "sha256"
     },
     {
+      "id": "github_release/github.com/golangci/golangci-lint/v2.13.2/golangci-lint-2.13.2-darwin-amd64.tar.gz",
+      "checksum": "8A13AAF9CBBB1DEE52824E862CF0D0720E5BB97C1F4260D1E51623A09492B57B",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/golangci/golangci-lint/v2.13.2/golangci-lint-2.13.2-darwin-arm64.tar.gz",
+      "checksum": "F4BF83F0B64F055C42B28FC9A38861839F69C096E61C788E72DFAAE412011789",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/golangci/golangci-lint/v2.13.2/golangci-lint-2.13.2-linux-amd64.tar.gz",
+      "checksum": "2277D43B98EC0054280F2AC26B53268BAE97682444678A59A657DD565DA021D6",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/golangci/golangci-lint/v2.13.2/golangci-lint-2.13.2-linux-arm64.tar.gz",
+      "checksum": "A2A4E0065AA41BE71F7C5AC90F271B61751331E5D04314E62AFE4027855F0893",
+      "algorithm": "sha256"
+    },
+    {
       "id": "github_release/github.com/kubernetes-sigs/kind/v0.31.0/kind-darwin-amd64",
       "checksum": "A8B3CF77B2AD77AEC5BF710D1A2589D9117576132AF812885CAD41E9DEDE4D4E",
       "algorithm": "sha256"
@@ -101,6 +121,26 @@
       "algorithm": "sha256"
     },
     {
+      "id": "github_release/github.com/suzuki-shunsuke/pinact/v4.1.1/pinact_darwin_amd64.tar.gz",
+      "checksum": "513678FDB0BB59B2742DD06D28F0EE851496A83BA939954009AA6BE53F5AEC9C",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/pinact/v4.1.1/pinact_darwin_arm64.tar.gz",
+      "checksum": "C13998C9F0DD09D8973700938AA5F6AC52A1DB4E94D4F578D8CC976CDA478614",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/pinact/v4.1.1/pinact_linux_amd64.tar.gz",
+      "checksum": "D1CFFEBE5704B74E2E5F8A864EFB9F7E54768972DC686188C008033FB1797841",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/pinact/v4.1.1/pinact_linux_arm64.tar.gz",
+      "checksum": "DD1F29908319ED3E59F9FE6B39196EFBB76936357F3BD741CD759A96306AE8D8",
+      "algorithm": "sha256"
+    },
+    {
       "id": "github_release/github.com/tilt-dev/ctlptl/v0.9.2/ctlptl.0.9.2.linux.arm64.tar.gz",
       "checksum": "873436DF179ABF67CAAFBE4B6F0C5DC74861CC872F9B507BED6C2EDCA773058B",
       "algorithm": "sha256"
@@ -138,6 +178,26 @@
     {
       "id": "github_release/github.com/tilt-dev/ctlptl/v0.9.4/ctlptl.0.9.4.mac.x86_64.tar.gz",
       "checksum": "2596555A136A5FEABD32DD6D1569BDEE3C9A85CDF84904F60CD4C37E97227FAC",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/tilt-dev/ctlptl/v0.9.5/ctlptl.0.9.5.linux.arm64.tar.gz",
+      "checksum": "6096BABBC4A7998FD3D2D8FEE9C7A51EFC2435E22E7A8DC990BB815587D03704",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/tilt-dev/ctlptl/v0.9.5/ctlptl.0.9.5.linux.x86_64.tar.gz",
+      "checksum": "CF5F0F918C34DE069047706448D825015843BEB1A829EC3AB2D3B81F6E309D18",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/tilt-dev/ctlptl/v0.9.5/ctlptl.0.9.5.mac.arm64.tar.gz",
+      "checksum": "58261C33D32407CCBB69CA8445CC9D014E399E585F966FDD833CCEE3B304751A",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/tilt-dev/ctlptl/v0.9.5/ctlptl.0.9.5.mac.x86_64.tar.gz",
+      "checksum": "D26B3FB661412B84C69D5CE2A740E1FD380D91730E3EE54B36A7268D20ED8C60",
       "algorithm": "sha256"
     },
     {
@@ -181,6 +241,26 @@
       "algorithm": "sha256"
     },
     {
+      "id": "github_release/github.com/tilt-dev/tilt/v0.37.7/tilt.0.37.7.linux.arm64.tar.gz",
+      "checksum": "9F381347FA18FFCA3F1D3DCDD3F6745281A6647E6107199832CEAA62A461964A",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/tilt-dev/tilt/v0.37.7/tilt.0.37.7.linux.x86_64.tar.gz",
+      "checksum": "B695193FAB68DEF8310CB971FA60BBE47BA0A782E24F54EBAD287C13316A61B0",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/tilt-dev/tilt/v0.37.7/tilt.0.37.7.mac.arm64.tar.gz",
+      "checksum": "7F54AFFF29CAE67E2751C13DF00A66D56F6FBC4463573089059BA673CF128687",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/tilt-dev/tilt/v0.37.7/tilt.0.37.7.mac.x86_64.tar.gz",
+      "checksum": "2022E675F9A32CDC651E8096A12CAA38720BE2D692D7347798607873A107FD61",
+      "algorithm": "sha256"
+    },
+    {
       "id": "http/dl.k8s.io/v1.35.4/bin/darwin/amd64/kubectl",
       "checksum": "DDDB01BDDB96F78E48E33105CCFA2FEEDFF585A8B2E3B812F5D0F64C7403710A",
       "algorithm": "sha256"
@@ -203,6 +283,11 @@
     {
       "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.496.0/registry.yaml",
       "checksum": "4A04DA198765DDC0C008993BB455164ABE4A5D5FD7930CCC1DF3231557571DED",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.558.1/registry.yaml",
+      "checksum": "2A024E9CBE9BB672963ED0C68241A41C9F13B4D253390D548EC0B6D3E59A2DDC",
       "algorithm": "sha256"
     }
   ]
