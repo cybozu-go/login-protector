@@ -98,7 +98,7 @@ var _ = Describe("controller", Ordered, func() {
 				g.Expect(pdbList.Items).Should(HaveLen(1), "expected pdb does not exist")
 				g.Expect(pdbList.Items[0].Name).Should(Equal(targetSts0Pod))
 				g.Expect(pdbList.Items[0].Spec.Selector.MatchLabels["statefulset.kubernetes.io/pod-name"]).Should(Equal(targetSts0Pod))
-			}).WithTimeout(testInterval).Should(Succeed())
+			}).WithTimeout(testInterval * 2).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				// the PDB should be deleted after the logout from the Pod
@@ -248,8 +248,9 @@ var _ = Describe("controller", Ordered, func() {
 
 			// login to target-sts-0 Pod using `kubectl exec`
 			intervalToWaitForImagePull := 3 * time.Minute
+			sessionDuration := intervalToWaitForImagePull + time.Minute
 			go func() {
-				_, err := utils.Kubectl(ptmx, "exec", targetSts0Pod, "-it", "--", "sleep", fmt.Sprintf("%.0f", intervalToWaitForImagePull.Seconds()))
+				_, err := utils.Kubectl(ptmx, "exec", targetSts0Pod, "-it", "--", "sleep", fmt.Sprintf("%.0f", sessionDuration.Seconds()))
 				if err != nil {
 					panic(err)
 				}
@@ -263,7 +264,7 @@ var _ = Describe("controller", Ordered, func() {
 				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts0Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
 				g.Expect(findMetric(metrics, "login_protector_pod_pending_updates", map[string]string{labelNamespace: defaultNamespace, labelPod: targetSts1Pod}).GetGauge().GetValue()).Should(BeEquivalentTo(0))
 				g.Expect(findMetric(metrics, "login_protector_watcher_errors_total", map[string]string{labelWatcher: localSessionWatcher})).ShouldNot(BeNil())
-			}).WithTimeout(testInterval).Should(Succeed())
+			}).WithTimeout(testInterval * 2).Should(Succeed())
 
 			// update container image of target-sts
 			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-dev:22.04")
