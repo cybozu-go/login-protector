@@ -10,6 +10,18 @@ Follow [semantic versioning 2.0.0](https://semver.org/spec/v2.0.0.html) to choos
 
 Before you release, label pull requests appropriately. The release workflow creates a release note referring to the labels on the pull requests. You can check the rules for labeling in [release.yml](/.github/release.yml).
 
-## Run release workflow
+## Create a release pull request
 
-Run release workflow on [Actions tab](https://github.com/cybozu-go/login-protector/actions/workflows/release.yaml) with the release version `X.Y.Z`.
+1. Update the [`VERSION`](/VERSION) file to the new version number `X.Y.Z`.
+2. Regenerate the installer manifest:
+
+   ```sh
+   PROTECTOR_IMG=ghcr.io/cybozu-go/login-protector:X.Y.Z make build-installer
+   ```
+
+3. Commit the updated `VERSION` and `dist/install.yaml`, and open a pull request against `main`.
+4. Get the pull request reviewed and merge it.
+
+## Release
+
+Once the pull request is merged, the [Release workflow](https://github.com/cybozu-go/login-protector/actions/workflows/release.yaml) runs automatically on `main`, detects that `vX.Y.Z` has not been released yet, and builds and pushes the container images, pushes the `vX.Y.Z` tag, and creates the GitHub release with `dist/install.yaml` attached.
