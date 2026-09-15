@@ -15,7 +15,5 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - uses: ./.github/actions/setup-go
     - uses: ./.github/actions/aqua
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
     - run: make lint
     - run: make test-e2e
