@@ -1,36 +1,68 @@
 name: Release
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        type: string
-        required: true
-        description: The name of the tag to release (X.Y.Z)
+  push:
+    branches: [main]
+    paths: ["VERSION"]
 jobs:
+  check:
+    name: Check release necessity
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      version_tag: ${{ steps.check.outputs.version_tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check if the version in VERSION has already been released
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(cat VERSION | tr -d '[:space:]')
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid VERSION content: '$version'. Expected X.Y.Z"
+            exit 1
+          fi
+          version_tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${version_tag}" >> "$GITHUB_OUTPUT"
+          if body=$(gh api /repos/${{ github.repository }}/releases/tags/${version_tag}); then
+            echo "Release ${version_tag} already exists. Skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            status=$(echo "$body" | jq -r '.status // empty')
+            if [[ "$status" == "404" ]]; then
+              echo "Release ${version_tag} does not exist yet; releasing."
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Failed to check tag existence (unexpected response): ${body:-<empty>}"
+              exit 1
+            fi
+          fi
   release:
     name: Release login-protector
     runs-on: ubuntu-24.04
+    needs: check
+    if: needs.check.outputs.should_release == 'true'
     permissions:
       contents: write
       packages: write
     steps:
-      - name: Checkout main branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-      - name: Validate inputs
-        run: |
-          if [[ ! ${{ inputs.tag }} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag format. Please use X.Y.Z"
-            exit 1
-          fi
-          if git rev-parse v${{ inputs.tag }} >/dev/null 2>&1; then
-              echo "Tag v${{ inputs.tag }} already exists"
-              exit 1
-          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/aqua
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify dist/install.yaml is up to date
+        run: |
+          PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ needs.check.outputs.version }} make build-installer
+          git restore config/manager/kustomization.yaml
+          if ! git diff --exit-code --quiet -- dist/install.yaml; then
+            echo "dist/install.yaml is out of date for ${{ needs.check.outputs.version_tag }}."
+            echo "Run 'PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ needs.check.outputs.version }} make build-installer' locally and include the result in the release PR."
+            exit 1
+          fi
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - name: Login to GitHub Container Registry
@@ -45,7 +77,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/cybozu-go/login-protector:${{ inputs.tag }},ghcr.io/cybozu-go/login-protector:latest
+          tags: ghcr.io/cybozu-go/login-protector:${{ needs.check.outputs.version }},ghcr.io/cybozu-go/login-protector:latest
           target: login-protector
       - name: Build and Push local-session-tracker
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -53,27 +85,19 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/cybozu-go/local-session-tracker:${{ inputs.tag }},ghcr.io/cybozu-go/local-session-tracker:latest
+          tags: ghcr.io/cybozu-go/local-session-tracker:${{ needs.check.outputs.version }},ghcr.io/cybozu-go/local-session-tracker:latest
           target: local-session-tracker
       - name: Setup Git Config
         run: |
           git config --global user.name github-actions
           git config --global user.email github-actions@github.com
-      - name: Generate install.yaml and push tag
-        shell: bash -xe {0}
+      - name: Push tag
         run: |
-          PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ inputs.tag }} make build-installer
-          git checkout config/manager/kustomization.yaml
-          if ! git diff --exit-code --quiet; then
-            git add ./dist/install.yaml
-            git commit -m "Generate install.yaml for login-protector v${{ inputs.tag }}"
-            git push
-          fi
-          git tag -a v${{ inputs.tag }} -m "Release login-protector v${{ inputs.tag }}"
-          git push origin v${{ inputs.tag }}
+          git tag -a ${{ needs.check.outputs.version_tag }} -m "Release login-protector ${{ needs.check.outputs.version_tag }}"
+          git push origin ${{ needs.check.outputs.version_tag }}
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create v${{ inputs.tag }} --title "Release v${{ inputs.tag }}" --generate-notes
-          gh release upload v${{ inputs.tag }} ./dist/install.yaml --clobber
+          gh release create ${{ needs.check.outputs.version_tag }} --title "Release ${{ needs.check.outputs.version_tag }}" --generate-notes
+          gh release upload ${{ needs.check.outputs.version_tag }} ./dist/install.yaml --clobber
