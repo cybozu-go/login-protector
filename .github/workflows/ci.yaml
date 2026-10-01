@@ -19,3 +19,10 @@ jobs:
     - uses: ./.github/actions/aqua
     - run: make lint
     - run: make test-e2e
+    - name: Dump logs on failure
+      if: failure()
+      run: |
+        kubectl -n login-protector-system logs deploy/login-protector-controller-manager --all-containers || true
+        kubectl get pods -A -o wide || true
+        kubectl get pod -l name=target-sts -o yaml || true
+        kubectl logs -l name=target-sts -c local-session-tracker --prefix --tail=-1 || true

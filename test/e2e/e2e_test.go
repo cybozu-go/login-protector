@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/cybozu-go/login-protector/internal/common"
 	"github.com/cybozu-go/login-protector/test/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -239,12 +240,14 @@ var _ = Describe("controller", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer ptmx.Close()
 
-			// Wait for target-sts-0 Pod to be running
+			// Wait for target-sts-0 Pod to be running and polled by the local session watcher at least once.
+			// target-sts-0 Pod has been recreated by the previous test, so the first polls may fail.
 			Eventually(func(g Gomega) {
 				var pod corev1.Pod
 				err := utils.GetResource("", targetSts0Pod, &pod)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(pod.Status.Phase).Should(Equal(corev1.PodRunning))
+				g.Expect(pod.Annotations).Should(HaveKeyWithValue(common.AnnotationLoggedIn, common.ValueFalse))
 			}).Should(Succeed())
 
 			// login to target-sts-0 Pod using `kubectl exec`
