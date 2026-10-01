@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: main
-        image: ghcr.io/cybozu/ubuntu:22.04
+        image: ghcr.io/cybozu/ubuntu:26.04
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
       - name: local-session-tracker
@@ -48,7 +48,7 @@ spec:
     spec:
       containers:
       - name: main
-        image: ghcr.io/cybozu/ubuntu:22.04
+        image: ghcr.io/cybozu/ubuntu:26.04
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
       - name: local-session-tracker

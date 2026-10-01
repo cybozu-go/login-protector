@@ -28,6 +28,7 @@ const (
 	labelNamespace      = "namespace"
 	labelWatcher        = "watcher"
 	labelPod            = "pod"
+	ubuntu_version      = "26.04"
 )
 
 var _ = Describe("controller", Ordered, func() {
@@ -147,7 +148,7 @@ var _ = Describe("controller", Ordered, func() {
 			}).WithTimeout(testInterval).Should(Succeed())
 
 			// update container image of target-sts
-			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-debug:22.04")
+			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-debug:"+ubuntu_version)
 			Expect(err).NotTo(HaveOccurred())
 
 			// make sure the container image is not updated
@@ -157,7 +158,7 @@ var _ = Describe("controller", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				for _, c := range pod.Spec.Containers {
 					if c.Name == "main" {
-						g.Expect(c.Image).ShouldNot(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+						g.Expect(c.Image).ShouldNot(Equal("ghcr.io/cybozu/ubuntu-debug:" + ubuntu_version))
 					}
 				}
 			}).WithTimeout(testInterval).Should(Succeed())
@@ -177,7 +178,7 @@ var _ = Describe("controller", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				for _, c := range pod.Spec.Containers {
 					if c.Name == "main" {
-						g.Expect(c.Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:22.04"))
+						g.Expect(c.Image).Should(Equal("ghcr.io/cybozu/ubuntu-debug:" + ubuntu_version))
 					}
 				}
 			}).WithTimeout(3 * time.Minute).Should(Succeed())
@@ -266,7 +267,7 @@ var _ = Describe("controller", Ordered, func() {
 			}).WithTimeout(testInterval).Should(Succeed())
 
 			// update container image of target-sts
-			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-dev:22.04")
+			_, err = utils.Kubectl(nil, "set", "image", "sts/target-sts", "main=ghcr.io/cybozu/ubuntu-dev:"+ubuntu_version)
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func(g Gomega) {

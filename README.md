@@ -67,7 +67,7 @@ spec:
     spec:
       containers:
       - name: main
-        image: ghcr.io/cybozu/ubuntu:22.04
+        image: ghcr.io/cybozu/ubuntu:26.04
         imagePullPolicy: IfNotPresent
         command: [ "sleep", "infinity" ]
       - name: local-session-tracker
@@ -111,7 +111,7 @@ spec:
     spec:
       containers:
         - name: main
-          image: ghcr.io/cybozu/ubuntu:22.04
+          image: ghcr.io/cybozu/ubuntu:26.04
           imagePullPolicy: IfNotPresent
           command: [ "sleep", "infinity" ]
         - name: sidecar
@@ -226,7 +226,7 @@ The test Pod should not be evicted because it is logged in.
 Update the container image of the test Pod with the following command:
 
 ```bash
-kubectl set image sts/target-sts main=ghcr.io/cybozu/ubuntu-debug:22.04
+kubectl set image sts/target-sts main=ghcr.io/cybozu/ubuntu-debug:26.04
 ```
 
 The container image of the test Pod should not be updated because it is logged in.
