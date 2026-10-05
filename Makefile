@@ -87,8 +87,12 @@ run: manifests fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${PROTECTOR_IMG} . --target=login-protector
-	$(CONTAINER_TOOL) build -t ${TRACKER_IMG} . --target=local-session-tracker
+	@TAKUMI_NETRC="$$(grep -sF 'machine golang.flatt.tech ' "$${NETRC:-$$HOME/.netrc}" || true)"; \
+	export TAKUMI_NETRC; \
+	$(CONTAINER_TOOL) build $${TAKUMI_NETRC:+--secret id=netrc,env=TAKUMI_NETRC} \
+		-t ${PROTECTOR_IMG} . --target=login-protector; \
+	$(CONTAINER_TOOL) build $${TAKUMI_NETRC:+--secret id=netrc,env=TAKUMI_NETRC} \
+		-t ${TRACKER_IMG} . --target=local-session-tracker
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
