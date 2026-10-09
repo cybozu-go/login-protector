@@ -2,18 +2,23 @@
 FROM ghcr.io/cybozu/golang:1.27.1.1_noble@sha256:e38fe3b72f61d034394ee2c2592d41fa753226718bbc111bb6bb9a21601f0859 AS build
 
 WORKDIR /workspace
+
+ENV GOPROXY=https://golang.flatt.tech
+ENV NETRC=/run/secrets/netrc
+
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
+COPY go.mod go.sum ./
+
+# Download dependencies through Takumi Guard.
+RUN --mount=type=secret,id=netrc,target=/run/secrets/netrc,required=false \
+    go mod download
 
 # Copy the go source
 COPY cmd/ cmd/
 COPY internal/ internal/
 
-RUN CGO_ENABLED=0 go install -ldflags="-w -s" ./cmd/...
+# All dependencies were downloaded above.
+RUN CGO_ENABLED=0 GOPROXY=off go install -ldflags="-w -s" ./cmd/...
 
 # Build the local-session-tracker binary
 FROM scratch AS local-session-tracker
