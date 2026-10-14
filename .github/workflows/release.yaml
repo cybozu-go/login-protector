@@ -49,11 +49,16 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/aqua
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
+        with:
+          bot-id: ${{ vars.TAKUMI_GUARD_BOT_ID }}
+          set-goproxy: false
       - name: Verify dist/install.yaml is up to date
         run: |
           PROTECTOR_IMG=ghcr.io/${{ github.repository }}:${{ needs.check.outputs.version }} make build-installer
@@ -79,6 +84,8 @@ jobs:
           push: true
           tags: ghcr.io/cybozu-go/login-protector:${{ needs.check.outputs.version }},ghcr.io/cybozu-go/login-protector:latest
           target: login-protector
+          secret-files: |
+            netrc=/home/runner/.netrc
       - name: Build and Push local-session-tracker
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -87,6 +94,8 @@ jobs:
           push: true
           tags: ghcr.io/cybozu-go/local-session-tracker:${{ needs.check.outputs.version }},ghcr.io/cybozu-go/local-session-tracker:latest
           target: local-session-tracker
+          secret-files: |
+            netrc=/home/runner/.netrc
       - name: Setup Git Config
         run: |
           git config --global user.name github-actions
